@@ -110,8 +110,10 @@ On the EU development unit:
   The configured factory EUI was preserved exactly.
 - The gateway reached TTN Europe over verified TLS and received `Unauthorized`
   for a deliberate test-only token. This establishes DNS/TCP/TLS/LNS reachability,
-  **not authenticated TTN operation**. A real gateway LNS API key is still needed
-  for that test; no real key is included in this project.
+  independently of credentials. A subsequent test with an operator-provided
+  temporary gateway key **authenticated successfully**, received TTN's EU868
+  channel plan and started the concentrator. The temporary key was removed from
+  the gateway after testing; no real key is included in this project.
 - Isolated configuration tests rejected missing credentials, plaintext endpoints,
   and unsupported/conflicting region metadata. They verified CRLF bearer-file
   formatting, private token-file permissions, gain conversion, exact EUI use,
@@ -121,5 +123,5 @@ Run the synthetic metadata tests on the build host with
 `python3 tests/test_board_info.py`. On an updated development gateway with SSH
 key/agent access, run `python3 tests/test_station_config.py --target root@GATEWAY`.
 The latter uses a temporary configuration and synthetic identity; it does not
-change persistent settings or run the radio. Full authenticated uplink/downlink
-traffic against TTN and end-device RF behavior remain unverified.
+change persistent settings or run the radio. Authenticated TTN discovery and configuration passed. End-device uplink/downlink
+traffic and RF behavior remain unverified.
