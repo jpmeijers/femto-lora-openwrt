@@ -1,0 +1,31 @@
+diff --git a/net/lora-gateway-hal/Makefile b/net/lora-gateway-hal/Makefile
+index 80e802b..c2b63ff 100644
+--- a/net/lora-gateway-hal/Makefile
++++ b/net/lora-gateway-hal/Makefile
+@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=lora-gateway-hal
+ PKG_VERSION:=5.0.1
+-PKG_RELEASE:=2
++PKG_RELEASE:=3
+ 
+ PKG_SOURCE_URL:=https://codeload.github.com/Lora-net/lora_gateway/tar.gz/v$(PKG_VERSION)?
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+@@ -17,6 +17,7 @@ PKG_HASH:=1a0447d5e8183d08e6dce5f739f6872b9c57824b98f4078830d5ee21b15782c1
+ PKG_MAINTAINER:=Xue Liu <liuxuenetmail@gmail.com>
+ PKG_LICENSE_FILES:=LICENSE
+ PKG_BUILD_DIR:=$(BUILD_DIR)/lora_gateway-$(PKG_VERSION)
++PKG_CONFIG_DEPENDS:=CONFIG_SX1301_SPI_PATH CONFIG_SX1301_SPI_SPEED
+ 
+ include $(INCLUDE_DIR)/package.mk
+ include $(INCLUDE_DIR)/cmake.mk
+@@ -57,7 +58,8 @@ endef
+ CMAKE_OPTIONS += \
+ 		-DSPI_DEV_PATH:FILEPATH=$(CONFIG_SX1301_SPI_PATH) \
+ 		-DSPI_SPEED:STRING=$(CONFIG_SX1301_SPI_SPEED) \
+-		-Dlora_gateway_build_shared_libs=ON
++		-Dlora_gateway_build_shared_libs=ON \
++		-DDEBUG_HAL=ON -DDEBUG_REG=ON
+ 
+ define Build/InstallDev
+ 	$(INSTALL_DIR) $(1)/usr/include/libloragw

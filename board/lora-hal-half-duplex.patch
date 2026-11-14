@@ -1,0 +1,34 @@
+--- a/libloragw/src/loragw_spi.native.c
++++ b/libloragw/src/loragw_spi.native.c
+@@ -215,7 +215,7 @@
+     uint8_t out_buf[3];
+     uint8_t command_size;
+     uint8_t in_buf[ARRAY_SIZE(out_buf)];
+-    struct spi_ioc_transfer k;
++    struct spi_ioc_transfer k[2];
+     int a;
+ 
+     /* check input variables */
+@@ -241,14 +241,14 @@
+ 
+     /* I/O transaction */
+     memset(&k, 0, sizeof(k)); /* clear k */
+-    k.tx_buf = (unsigned long) out_buf;
+-    k.rx_buf = (unsigned long) in_buf;
+-    k.len = command_size;
+-    k.cs_change = 0;
+-    a = ioctl(spi_device, SPI_IOC_MESSAGE(1), &k);
+-
+-    /* determine return code */
+-    if (a != (int)k.len) {
++    k[0].tx_buf = (unsigned long) out_buf;
++    k[0].len = command_size - 1;
++    k[1].rx_buf = (unsigned long) &in_buf[command_size - 1];
++    k[1].len = 1;
++    a = ioctl(spi_device, SPI_IOC_MESSAGE(2), k);
++
++    /* determine return code */
++    if (a != command_size) {
+         DEBUG_MSG("ERROR: SPI READ FAILURE\n");
+         return LGW_SPI_ERROR;
+     } else {

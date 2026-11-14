@@ -1,0 +1,45 @@
+# Public allowlist. Hardware dumps, photos, logs, credentials and bench notes
+# remain local even if new files are added later.
+/*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LICENSE
+!/NOTICE.md
+!/requirements.txt
+!/board/
+!/docs/
+!/tools/
+!/firmware/
+
+# Generated or local-only material inside public directories.
+**/__pycache__/
+**/*.pyc
+/tools/python-deps/
+/board/*.o
+/board/*.elf
+/board/*.map
+/board/*.dis
+/board/*.dtb
+/board/rawdump
+/board/serial-file
+/board/uart-transfer-test.bin
+
+# Explicit sensitive/history exclusions for clarity.
+/private/
+/backups/
+/logs/
+/investigation/
+/artifacts/
+/Gemtek Femto/
+/vendor/
+/openwrt/
+/host-deps/
+/tftp/
+/.idea/
+/.agents/
+/.aws/
+/.codex/
+/IMG_*.jpg
+/*.deb
+/README.txt
