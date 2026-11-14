@@ -12,6 +12,7 @@ import subprocess
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--rootfs', type=Path)
+p.add_argument('--require-basicstation', action='store_true')
 p.add_argument('--forbidden-file', type=Path)
 a = p.parse_args()
 allowed_files = {'.gitignore', '.gitattributes', 'README.md', 'LICENSE', 'NOTICE.md', 'requirements.txt'}
@@ -50,6 +51,11 @@ if a.rootfs:
             errors.append((str(path), 'nonempty generated host private key'))
     conf = (a.rootfs / 'etc/config/lorawan').read_text()
     if "option gateway_id ''" not in conf: errors.append(('lorawan', 'default EUI is not blank'))
+    if a.require_basicstation:
+        if not (a.rootfs / 'usr/sbin/femto-basicstation').is_file(): errors.append(('rootfs', 'Basic Station missing'))
+        if "option lns_key ''" not in conf: errors.append(('lorawan', 'default LNS key is not blank'))
+        if "option enabled '0'" not in conf: errors.append(('lorawan', 'forwarding enabled in generic image'))
+        if not (a.rootfs / 'etc/ssl/certs/ca-certificates.crt').is_file(): errors.append(('rootfs', 'CA bundle missing'))
     plan = json.loads((a.rootfs / 'usr/share/lorawan/eu868.json').read_text())
     if plan['gateway_conf']['gateway_ID']: errors.append(('eu868.json', 'default EUI is not blank'))
     if len([k for k in plan['SX1301_conf'] if k.startswith('tx_lut_')]) != 16: errors.append(('eu868.json', 'missing EU reference gain table'))

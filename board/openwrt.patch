@@ -2857,11 +2857,11 @@ index 0000000..959c4dd
 + option advanced ''
 diff --git a/package/utils/femto-lorawan/files/etc/femto-release b/package/utils/femto-lorawan/files/etc/femto-release
 new file mode 100644
-index 0000000..188c9ba
+index 0000000..8de2ae6
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/femto-release
 @@ -0,0 +1,2 @@
-+Gemtek WLRGFM-100 experimental OpenWrt port: public-v2
++Gemtek WLRGFM-100 experimental OpenWrt port: public-v3
 +EU only; unsupported; no known factory rollback; flash at your own risk.
 diff --git a/package/utils/femto-lorawan/files/etc/init.d/lorawan b/package/utils/femto-lorawan/files/etc/init.d/lorawan
 new file mode 100755

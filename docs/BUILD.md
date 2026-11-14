@@ -99,12 +99,12 @@ Host metadata-parser checks: `python3 tests/test_board_info.py` (after prepare).
 ## Optional Basic Station package
 
 See [BASIC-STATION.md](BASIC-STATION.md) for the SX1301 package, TTN LNS setup
-and test limits. The development configuration selects `femto-basicstation=m`;
-change to `=y` only when you want to embed it in a newly built image. Use a fresh
+and test limits. The configuration selects `femto-basicstation=y`, embedding it in the
+firmware. Change to `=m` if you only want an optional IPK. Use a fresh
 OpenWrt preparation directory when changing between project revisions; the
 apply helper deliberately rejects a partially applied older board patch.
 
-The committed `firmware/` binaries remain the `public-v2` release artifacts.
+The committed `firmware/` binaries are the `public-v3` release artifacts.
 For their exact corresponding board source/configuration, check out Git tag
-`public-v2` before preparing the build. Development-source changes do not
+`public-v3` before preparing the build. Development-source changes do not
 retroactively change those published binary artifacts.

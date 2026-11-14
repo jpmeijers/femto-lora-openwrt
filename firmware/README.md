@@ -10,3 +10,7 @@ Read the root README before doing anything with these files.
 No per-device identifier, Wi-Fi password or private key is embedded. A numeric
 EU reference TX table is included. Identity and gain cache are read from your
 own hardware at runtime. Only EU models are supported; see docs/IDENTITY-AND-REGION.md.
+
+The `public-v3` image includes Basic Station and UDP, selectable in LuCI.
+Forwarding is disabled on a fresh installation; configure your own TTN LNS
+address and gateway API key. Existing protocol/settings are preserved on upgrade.

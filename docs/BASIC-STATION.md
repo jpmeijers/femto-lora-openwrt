@@ -1,10 +1,11 @@
 # Experimental Basic Station for TTN
 
 **EU only. Unsupported, at your own risk. No known tested factory rollback.**
-This is an experimental package integration; the `public-v2` downloadable
-firmware still contains the Semtech UDP forwarder only. Existing UDP settings
-remain the default. The two protocols share one concentrator and must not run
-at the same time.
+The `public-v3` downloadable firmware includes Basic Station and its LuCI
+controls. Older `public-v2` firmware contains UDP only. Upgrades preserve the
+selected protocol and credentials. New installs have forwarding disabled and
+UDP selected; configure Basic Station in LuCI to use TTN LNS. The two protocols
+share one concentrator and must not run at the same time.
 
 ## What is implemented
 
@@ -42,11 +43,11 @@ Check out the development revision containing this document and follow
 ./tools/build.sh package/femto-lorawan/compile -j4
 ```
 
-`board/config.build` selects Station as an optional module package (`=m`), so
-it is built as an IPK and is not included in the default firmware rootfs.
-To include it in a newly built firmware, select `CONFIG_PACKAGE_femto-basicstation=y`
-in OpenWrt configuration before running the full build. Merely installing the
-package does not select Station or replace your configured UDP connection.
+`board/config.build` selects Station as built-in (`=y`), so a full firmware
+build includes it and also produces its IPK. Change to `=m` if you only want an
+optional package. Installing a package alone does not select Station or replace
+your configured UDP connection. With `public-v3`, no separate package installation
+is needed: use the LoRaWAN page in LuCI.
 
 On a gateway **already running this project's matching OpenWrt port**, install
 both IPKs from `openwrt/bin/packages/mipsel_24kc/base/` with `opkg install` after
@@ -125,3 +126,10 @@ key/agent access, run `python3 tests/test_station_config.py --target root@GATEWA
 The latter uses a temporary configuration and synthetic identity; it does not
 change persistent settings or run the radio. Authenticated TTN discovery and configuration passed. End-device uplink/downlink
 traffic and RF behavior remain unverified.
+
+The exact `public-v3` firmware was subsequently installed by NAND sysupgrade on
+the EU development unit. Private settings and SSH key hashes were preserved;
+Basic Station reconnected to TTN, received the EU868 plan and started the
+concentrator. The Station process owned an established LNS TCP connection after
+reboot. The operator-configured service had also shown continuous concentrator
+time synchronization for more than an hour before this upgrade.

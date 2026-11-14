@@ -206,11 +206,13 @@ The default upstream ACK timeout is 1000 ms to tolerate longer Internet paths.
 
 ## Experimental Basic Station
 
-An optional SX1301 Basic Station package and LuCI protocol controls are available
-in the development source. It supports direct TTN LNS connections over verified
-TLS with a gateway API key. The `public-v2` firmware downloads contain UDP only;
-see [Basic Station build, setup and validation notes](docs/BASIC-STATION.md)
-before installing the experimental packages.
+The `public-v3` firmware includes SX1301 Basic Station and LuCI protocol controls.
+It supports direct TTN LNS connections over verified TLS with a gateway API key.
+Choose **Basic Station** under **Services → LoRaWAN**, enter your LNS address
+and gateway API key, then enable forwarding. See [Basic Station setup and
+validation notes](docs/BASIC-STATION.md). UDP remains available and existing
+protocol/settings are preserved on upgrade. New installations start with
+forwarding disabled and UDP selected until you configure a connection.
 
 ## Later OpenWrt upgrades
 
