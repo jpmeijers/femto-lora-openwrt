@@ -16,5 +16,6 @@ Existing components retain their upstream licenses and copyright notices.
   Package source locations, archive hashes and patches are recorded in the
   pinned OpenWrt and feed recipes. See `docs/BUILD.md` for obtaining sources.
 
-No factory firmware, hardware dump, per-unit calibration, Wi-Fi password,
-private signing key, device identifier, or original device photograph is included.
+No factory firmware, hardware dump, Wi-Fi password, private signing key, device
+identifier, or original device photograph is included. A numeric reference EU
+TX gain table is included; it contains no device identity or credentials.

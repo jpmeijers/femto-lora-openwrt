@@ -1,6 +1,6 @@
 # Public build
 
-Build identifier: `public-v1`, prepared 2026-11-14.
+Build identifier: `public-v2`, prepared 2026-11-14.
 OpenWrt 23.05 branch / Linux 5.15.211, MIPS little-endian 24kc.
 Exact upstream revisions and regeneration commands: `docs/BUILD.md`.
 Matching build configuration and board source: `board/config.build` and
@@ -8,10 +8,12 @@ Matching build configuration and board source: `board/config.build` and
 Package versions: `packages.manifest`.
 
 These files were built from source, not exported from a running device.
-Default gateway EUI is blank, no per-unit TX gain table is included, Wi-Fi
-and LoRa are disabled, and build metadata uses generic builder/host names.
-The TX-enable guard requires a user-supplied calibration plan. Firmware
-SHA256 values are in `SHA256SUMS`.
+No device EUI is embedded. Runtime discovery prefers the factory EEPROM cache
+and falls back to a locally administered EUI derived from the factory Wi-Fi MAC.
+The EU reference TX table is included; a valid factory cache takes precedence.
+Wi-Fi and forwarding start disabled; downlinks default to enabled. Only EU
+hardware is supported. Firmware SHA256 values are in `SHA256SUMS`.
+
 
 The underlying port was exercised on one EU unit; this remains an unsupported
 experimental build, not a generally certified hardware release. See the
@@ -27,11 +29,20 @@ running NAND root before performing writes. Its complete factory-to-RAM install
 sequence has not been tested as an automated procedure on pristine factory
 firmware. The underlying manual write sequence was used during bring-up.
 
-The default configuration rejects a blank EUI and rejects TX without a supplied
-calibration plan. Generic receive-only concentrator startup passed on hardware, separately
-from the private per-unit operating configuration. Public images
-and patches passed a scan against known private identifiers and credentials;
-the extracted rootfs has no nonempty generated SSH host private keys.
+Synthetic host tests cover CRC validation, EUI recovery/fallback, region detection
+and conflicting metadata. Runtime default and regional-guard validation results
+are recorded below. Public files and extracted rootfs are checked against known
+private identifiers and credentials; no generated host private keys are included.
 
 Published UBI root volume was matched to the audited Squashfs; both uImage
 CRCs and the embedded RAM CPIO were checked as part of the privacy audit.
+
+The public-v2 image booted through NAND sysupgrade with private settings and SSH
+keys unchanged. The board helper recovered the existing factory EUI and all 16
+gain entries on the EU unit. Default generation enabled downlinks and preferred
+the cached table. Tests rejected non-EU/conflicting metadata and required EU
+confirmation for unknown metadata; the reference-table fallback generated
+successfully. The automatic-table plan initialized the concentrator on hardware.
+No end-device downlink RF power measurement or round-trip test is claimed.
+The read-only backup helper captured a small partition in both data-only and
+raw-with-OOB formats; decompressed sizes and SHA256 matched the manifest.

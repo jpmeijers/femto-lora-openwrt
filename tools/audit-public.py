@@ -15,7 +15,7 @@ p.add_argument('--rootfs', type=Path)
 p.add_argument('--forbidden-file', type=Path)
 a = p.parse_args()
 allowed_files = {'.gitignore', '.gitattributes', 'README.md', 'LICENSE', 'NOTICE.md', 'requirements.txt'}
-allowed_dirs = {'board', 'docs', 'tools', 'firmware'}
+allowed_dirs = {'board', 'docs', 'tools', 'firmware', 'tests'}
 needles = []
 if a.forbidden_file:
     needles = [x for x in a.forbidden_file.read_bytes().splitlines() if len(x) >= 6]
@@ -52,8 +52,8 @@ if a.rootfs:
     if "option gateway_id ''" not in conf: errors.append(('lorawan', 'default EUI is not blank'))
     plan = json.loads((a.rootfs / 'usr/share/lorawan/eu868.json').read_text())
     if plan['gateway_conf']['gateway_ID']: errors.append(('eu868.json', 'default EUI is not blank'))
-    if any(k.startswith('tx_lut_') for k in plan['SX1301_conf']): errors.append(('eu868.json', 'bundled TX calibration'))
-    if plan['SX1301_conf']['radio_0']['tx_enable']: errors.append(('eu868.json', 'TX enabled by default'))
+    if len([k for k in plan['SX1301_conf'] if k.startswith('tx_lut_')]) != 16: errors.append(('eu868.json', 'missing EU reference gain table'))
+    if not plan['SX1301_conf']['radio_0']['tx_enable']: errors.append(('eu868.json', 'EU TX default unexpectedly disabled'))
 if errors:
     for name, why in errors: print(f'FAIL: {name}: {why}')
     raise SystemExit(1)

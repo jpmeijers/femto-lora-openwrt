@@ -31,6 +31,6 @@ downloads in openwrt/dl/. The normal prepare helper expects upstream Git
 metadata; the bundled archives supply the code even without that metadata.
 No private gateway dumps, credentials, hardware identifiers or keys are bundled.
 TXT
-out=${1:-private/femto-lora-openwrt-public-v1-sources.tar.gz}
+out=${1:-private/femto-lora-openwrt-sources.tar.gz}
 tar --owner=0 --group=0 --numeric-owner -czf "$out" -C "$stage" .
 sha256sum "$out"

@@ -70,10 +70,12 @@ other boards keep existing behavior. At the chosen clock the configuration
 register is `0x135`; the SPI parent clock was approximately 193 MHz.
 
 FPGA notch-filter programming may produce a warning. TX behavior and RF power
-are not comprehensively validated. The public EU868 template uses reference
-channel/RSSI settings, has a blank EUI and no unit's TX gain table. Supply your
-own calibration before enabling transmission. Never write calibration EEPROM
-or manufacture identifiers to work around missing original information.
+are not comprehensively validated. Only EU hardware is supported. The EU868
+template includes the development unit's numeric reference gain table;
+valid factory-cached entries take precedence. Automatic EUI discovery, region
+checks and evidence about calibration are documented in
+[IDENTITY-AND-REGION.md](IDENTITY-AND-REGION.md). Never write calibration EEPROM
+during normal installation or operation.
 
 ## UART loader
 

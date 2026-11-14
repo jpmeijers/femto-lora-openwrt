@@ -10,6 +10,7 @@
 !/board/
 !/docs/
 !/tools/
+!/tests/
 !/firmware/
 
 # Generated or local-only material inside public directories.

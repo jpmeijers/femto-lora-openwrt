@@ -22,9 +22,13 @@ supported OpenWrt device or a commitment to ongoing security maintenance.
 Ethernet, persistent configuration, Wi-Fi station association/DHCP/DNS, Wi-Fi AP
 beaconing/scanning, LoRa initialization, UDP gateway-server acknowledgments,
 LuCI settings, web upgrades and normal reboot have been exercised on one unit.
-The generic public image intentionally contains **no device EUI or per-unit TX
-calibration**. Wi-Fi and LoRa forwarding start disabled. Downlink transmission
-requires your own calibrated gain table. RF power, receiver sensitivity,
+Only **EU variants are supported**. The image recovers the LoRa EUI and gain
+table from valid factory cache data when available. Otherwise it generates a
+locally administered EUI from the factory Wi-Fi MAC and uses the included EU
+reference gain table. Wi-Fi and forwarding start disabled; **downlinks default
+to enabled** once forwarding is configured. Known non-EU units are refused;
+unknown units require explicit EU confirmation in LuCI.
+RF power, receiver sensitivity,
 end-device RF round trips, other hardware revisions and cold-power recovery
 are not comprehensively validated. The Wi-Fi driver can report an RXIQ
 calibration warning while continuing to operate. See [board notes](docs/BOARD.md).
@@ -41,9 +45,12 @@ RTS or DTR. Never use RS-232 voltage levels or 5 V UART signalling.
 
 Before changing anything, use the original management interface to save the
 LoRa gateway EUI, regional settings and calibrated TX gain table if available.
-The enclosure MAC is not the LoRa EUI. Keep your own backups and records private;
-no other user's calibration or identifiers are supplied by this project.
-If you cannot recover a TX calibration table, keep downlink transmission off.
+The enclosure MAC is not necessarily the original LoRa EUI. Keep backups and
+identifiers private. See [identity, region and gain-table details](docs/IDENTITY-AND-REGION.md)
+for discovery and fallback behavior. We have no proof that all units have
+identical calibration or that each unit was calibrated individually.
+For US-model investigation, follow the [read-only firmware dump instructions](docs/DUMPING.md);
+do not install this EU firmware onto a US unit.
 
 ### 1. Get the project and firmware
 
@@ -185,11 +192,11 @@ and set a password immediately under **System → Administration**.
   create/use a DHCP interface such as `wwan` in the appropriate firewall zone.
 - **Network → DHCP and DNS:** DNS settings. DHCP serving on LAN is initially
   disabled; enable it under the LAN interface if you need client leases.
-- **Services → LoRaWAN:** enter **your own** EUI and network-server hostname,
-  configure the channel plan for your hardware/region, then enable forwarding.
-  Start with receive-only operation. To enable downlinks, supply your own full
-  Semtech JSON plan including calibrated `tx_lut_*` entries in Advanced; the
-  public template deliberately contains no unit's TX calibration table.
+- **Services → LoRaWAN:** check the automatically discovered EUI, enter your
+  network-server hostname and select the EU channel plan, then enable forwarding.
+  Register the displayed EUI with your server; a manual EUI can override it.
+  Downlinks default to enabled with the cached factory gain table or included
+  EU reference table. Advanced JSON can override the plan and gain table.
 - **System → System Log:** Wi-Fi, concentrator and packet-forwarder diagnostics.
   **System → System** provides clock/timezone settings and browser time sync.
 

@@ -91,5 +91,7 @@ The individual upstream licenses remain applicable; see `NOTICE.md`.
 Do not publish a filesystem copied from a running gateway. It contains private
 configuration, generated host keys and identifiers. Use a clean build; inspect
 both the staged Git files and extracted Squashfs before uploading binaries.
-The image deliberately leaves gateway EUI blank, omits per-unit TX calibration,
-and sets generic build user/host metadata. Factory EEPROM is read at runtime.
+The image has no hardcoded gateway EUI and uses generic build user/host metadata.
+It includes a numeric EU reference TX table. Factory identity and calibration
+cache are read on the user's own gateway at runtime; see `IDENTITY-AND-REGION.md`.
+Host metadata-parser checks: `python3 tests/test_board_info.py` (after prepare).

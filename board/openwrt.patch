@@ -2793,14 +2793,14 @@ index 0000000..94f015e
 +}
 diff --git a/package/utils/femto-lorawan/Makefile b/package/utils/femto-lorawan/Makefile
 new file mode 100644
-index 0000000..696d5b9
+index 0000000..9deb453
 --- /dev/null
 +++ b/package/utils/femto-lorawan/Makefile
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,36 @@
 +include $(TOPDIR)/rules.mk
 +PKG_NAME:=femto-lorawan
 +PKG_VERSION:=4.0.1
-+PKG_RELEASE:=2
++PKG_RELEASE:=3
 +PKG_SOURCE:=femto-packet-forwarder.tar.gz
 +PKG_SOURCE_URL:=https://codeload.github.com/Lora-net/packet_forwarder/tar.gz/d0226eae6e7b6bbaec6117d0d2372bf17819c438?
 +PKG_HASH:=68921bb22f292cb3a4ee94cef106355709a081e86fceadf2e685d476152fb812
@@ -2822,6 +2822,7 @@ index 0000000..696d5b9
 +define Build/Compile
 +	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -I$(STAGING_DIR)/usr/include/libloragw -I$(PKG_BUILD_DIR)/lora_pkt_fwd/inc -DVERSION_STRING='"4.0.1"' $(PKG_BUILD_DIR)/lora_pkt_fwd/src/*.c $(TARGET_LDFLAGS) -lloragw -lrt -lpthread -lm -o $(PKG_BUILD_DIR)/lora_pkt_fwd/lora_pkt_fwd
 +	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -I$(STAGING_DIR)/usr/include/libloragw ./src/probe.c $(TARGET_LDFLAGS) -lloragw -o $(PKG_BUILD_DIR)/femto-lora-probe
++	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) ./src/board-info.c $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/femto-board-info
 +endef
 +
 +define Package/femto-lorawan/install
@@ -2829,21 +2830,23 @@ index 0000000..696d5b9
 +	$(INSTALL_DIR) $(1)/usr/sbin
 +	$(INSTALL_BIN) $(PKG_BUILD_DIR)/lora_pkt_fwd/lora_pkt_fwd $(1)/usr/sbin/
 +	$(INSTALL_BIN) $(PKG_BUILD_DIR)/femto-lora-probe $(1)/usr/sbin/
++	$(INSTALL_BIN) $(PKG_BUILD_DIR)/femto-board-info $(1)/usr/sbin/
 +endef
 +$(eval $(call BuildPackage,femto-lorawan))
 diff --git a/package/utils/femto-lorawan/files/etc/config/lorawan b/package/utils/femto-lorawan/files/etc/config/lorawan
 new file mode 100644
-index 0000000..f0eecc5
+index 0000000..c4385fa
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/config/lorawan
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +config gateway 'main'
 + option enabled '0'
 + option server 'localhost'
 + option port_up '1700'
 + option port_down '1700'
 + option gateway_id ''
-+ option tx_enabled '0'
++ option region 'auto'
++ option tx_enabled '1'
 + option antenna_gain '0'
 + option radio0_frequency '867500000'
 + option radio1_frequency '868500000'
@@ -2851,12 +2854,12 @@ index 0000000..f0eecc5
 + option advanced ''
 diff --git a/package/utils/femto-lorawan/files/etc/femto-release b/package/utils/femto-lorawan/files/etc/femto-release
 new file mode 100644
-index 0000000..f7bd8f1
+index 0000000..188c9ba
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/femto-release
 @@ -0,0 +1,2 @@
-+Gemtek WLRGFM-100 experimental OpenWrt port: public-v1
-+Unsupported; no known factory rollback; flash at your own risk.
++Gemtek WLRGFM-100 experimental OpenWrt port: public-v2
++EU only; unsupported; no known factory rollback; flash at your own risk.
 diff --git a/package/utils/femto-lorawan/files/etc/init.d/lorawan b/package/utils/femto-lorawan/files/etc/init.d/lorawan
 new file mode 100755
 index 0000000..349c4c3
@@ -2923,26 +2926,32 @@ index 0000000..7fc19f9
 +exit 0
 diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config
 new file mode 100755
-index 0000000..25d1d54
+index 0000000..4a18b58
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,30 @@
 +#!/usr/bin/ucode
 +'use strict';
-+import { readfile, writefile } from 'fs';
++import { readfile, writefile, popen } from 'fs';
 +import { cursor } from 'uci';
 +let u = cursor();
 +let g = u.get_all('lorawan', 'main');
++let board_command = popen('/usr/sbin/femto-board-info', 'r');
++let board = board_command ? json(board_command.read('all')) : {};
++if (board_command) board_command.close();
++if (board.region_conflict || board.region == 'NON_EU') die('Unsupported or conflicting region: only EU hardware is supported\n');
++if (board.region != 'EU' && g.region != 'EU') die('Region unknown: verify the enclosure EU marking and select EU in LuCI\n');
 +let c = json(g.advanced || readfile('/usr/share/lorawan/eu868.json'));
++let eui = g.gateway_id || board.eui || '';
++if (!g.advanced && length(board.tx_lut || []) == 16)
++ for (let i = 0; i < 16; i++) c.SX1301_conf['tx_lut_' + i] = board.tx_lut[i];
 +if (type(c.SX1301_conf) != 'object' || type(c.gateway_conf) != 'object') die('Missing SX1301_conf or gateway_conf\n');
-+if (!match(g.gateway_id, /^[a-fA-F0-9]{16}$/)) die('Gateway EUI must contain 16 hexadecimal digits\n');
-+c.gateway_conf.gateway_ID = g.gateway_id;
++if (!match(eui, /^[a-fA-F0-9]{16}$/)) die('Gateway EUI must contain 16 hexadecimal digits\n');
++c.gateway_conf.gateway_ID = eui;
 +c.gateway_conf.server_address = g.server;
 +c.gateway_conf.serv_port_up = +g.port_up;
 +c.gateway_conf.serv_port_down = +g.port_down;
 +c.gateway_conf.gps_tty_path = '';
-+if (g.tx_enabled == '1' && (type(c.SX1301_conf.tx_lut_0) != 'object' || !g.advanced))
-+ die('Downlink transmission requires your own calibrated TX gain table in the advanced JSON plan\n');
 +c.SX1301_conf.antenna_gain = +g.antenna_gain;
 +c.SX1301_conf.radio_0.tx_enable = g.tx_enabled == '1';
 +c.SX1301_conf.radio_1.tx_enable = false;
@@ -2984,10 +2993,10 @@ index 0000000..e24b5fa
 +exec /usr/sbin/lora_pkt_fwd
 diff --git a/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json b/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json
 new file mode 100644
-index 0000000..d1ee4e0
+index 0000000..5465ac8
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,209 @@
 +{
 +  "SX1301_conf": {
 +    "lorawan_public": true,
@@ -3021,7 +3030,7 @@ index 0000000..d1ee4e0
 +      "type": "SX1257",
 +      "freq": 867500000,
 +      "rssi_offset": -166.0,
-+      "tx_enable": false,
++      "tx_enable": true,
 +      "tx_notch_freq": 129000,
 +      "tx_freq_min": 863000000,
 +      "tx_freq_max": 870000000
@@ -3086,6 +3095,102 @@ index 0000000..d1ee4e0
 +      "if": 300000,
 +      "bandwidth": 125000,
 +      "datarate": 50000
++    },
++    "tx_lut_0": {
++      "pa_gain": 0,
++      "mix_gain": 10,
++      "rf_power": -7,
++      "dig_gain": 2
++    },
++    "tx_lut_1": {
++      "pa_gain": 0,
++      "mix_gain": 12,
++      "rf_power": -4,
++      "dig_gain": 1
++    },
++    "tx_lut_2": {
++      "pa_gain": 1,
++      "mix_gain": 8,
++      "rf_power": -1,
++      "dig_gain": 1
++    },
++    "tx_lut_3": {
++      "pa_gain": 1,
++      "mix_gain": 10,
++      "rf_power": 2,
++      "dig_gain": 1
++    },
++    "tx_lut_4": {
++      "pa_gain": 1,
++      "mix_gain": 10,
++      "rf_power": 4,
++      "dig_gain": 0
++    },
++    "tx_lut_5": {
++      "pa_gain": 1,
++      "mix_gain": 13,
++      "rf_power": 7,
++      "dig_gain": 1
++    },
++    "tx_lut_6": {
++      "pa_gain": 2,
++      "mix_gain": 10,
++      "rf_power": 10,
++      "dig_gain": 1
++    },
++    "tx_lut_7": {
++      "pa_gain": 2,
++      "mix_gain": 10,
++      "rf_power": 11,
++      "dig_gain": 0
++    },
++    "tx_lut_8": {
++      "pa_gain": 2,
++      "mix_gain": 11,
++      "rf_power": 12,
++      "dig_gain": 1
++    },
++    "tx_lut_9": {
++      "pa_gain": 2,
++      "mix_gain": 12,
++      "rf_power": 14,
++      "dig_gain": 1
++    },
++    "tx_lut_10": {
++      "pa_gain": 3,
++      "mix_gain": 8,
++      "rf_power": 16,
++      "dig_gain": 1
++    },
++    "tx_lut_11": {
++      "pa_gain": 3,
++      "mix_gain": 11,
++      "rf_power": 20,
++      "dig_gain": 2
++    },
++    "tx_lut_12": {
++      "pa_gain": 3,
++      "mix_gain": 12,
++      "rf_power": 23,
++      "dig_gain": 1
++    },
++    "tx_lut_13": {
++      "pa_gain": 3,
++      "mix_gain": 12,
++      "rf_power": 24,
++      "dig_gain": 0
++    },
++    "tx_lut_14": {
++      "pa_gain": 3,
++      "mix_gain": 13,
++      "rf_power": 24.5,
++      "dig_gain": 1
++    },
++    "tx_lut_15": {
++      "pa_gain": 3,
++      "mix_gain": 14,
++      "rf_power": 25,
++      "dig_gain": 1
 +    }
 +  },
 +  "gateway_conf": {
@@ -3128,10 +3233,10 @@ index 0000000..07f421b
 \ No newline at end of file
 diff --git a/package/utils/femto-lorawan/files/usr/share/rpcd/acl.d/luci-app-lorawan.json b/package/utils/femto-lorawan/files/usr/share/rpcd/acl.d/luci-app-lorawan.json
 new file mode 100644
-index 0000000..f887ce1
+index 0000000..a4020fe
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/share/rpcd/acl.d/luci-app-lorawan.json
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,28 @@
 +{
 +  "luci-app-lorawan": {
 +    "description": "Manage the Femto LoRaWAN concentrator",
@@ -3147,6 +3252,9 @@ index 0000000..f887ce1
 +      "file": {
 +        "/usr/share/lorawan/eu868.json": [
 +          "read"
++        ],
++        "/usr/sbin/femto-board-info": [
++          "exec"
 +        ]
 +      }
 +    },
@@ -3157,13 +3265,12 @@ index 0000000..f887ce1
 +    }
 +  }
 +}
-\ No newline at end of file
 diff --git a/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/config.js b/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/config.js
 new file mode 100644
-index 0000000..a329ba0
+index 0000000..2bb2ff2
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/config.js
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,57 @@
 +'use strict';
 +'require view';
 +'require form';
@@ -3174,10 +3281,11 @@ index 0000000..a329ba0
 +
 +var getService = rpc.declare({object: 'service', method: 'list', params: ['name'], expect: { '': {} }});
 +return view.extend({
-+ load: function() { return Promise.all([uci.load('lorawan'), getService('lorawan')]); },
++ load: function() { return Promise.all([uci.load('lorawan'), getService('lorawan'), fs.exec('/usr/sbin/femto-board-info').then(function(r) { return JSON.parse(r.stdout); })]); },
 + render: function(data) {
 +  var instances = ((data[1].lorawan || {}).instances || {});
 +  var running = Object.keys(instances).some(function(k) { return instances[k].running; });
++  var board=data[2] || {};
 +  var m = new form.Map('lorawan', _('LoRaWAN'), _('Semtech SX1301 / SX1257 concentrator. Configure your network server and gateway EUI, then enable forwarding. Default channel plan: EU868. Use System → System Log to view radio initialization and packet statistics.'));
 +  var s = m.section(form.NamedSection, 'main', 'gateway');
 +  s.tab('general', _('Gateway'));
@@ -3194,15 +3302,23 @@ index 0000000..a329ba0
 +   });
 +  },5);
 +  o = s.taboption('general', form.Flag, 'enabled', _('Enable packet forwarder')); o.rmempty = false;
-+  o = s.taboption('general', form.Value, 'gateway_id', _('Gateway EUI')); o.rmempty=false;
-+  o.validate=function(sid,v) { return /^[0-9a-fA-F]{16}$/.test(v) || _('Enter 16 hexadecimal digits'); };
++  o = s.taboption('general', form.Value, 'gateway_id', _('Gateway EUI'), _('Leave empty to use the factory EEPROM cache, or a locally administered EUI derived from the factory Wi-Fi MAC.')); o.rmempty=true; o.placeholder=board.eui || _('Unavailable');
++  o.validate=function(sid,v) { return !v || /^[0-9a-fA-F]{16}$/.test(v) || _('Enter 16 hexadecimal digits'); };
++  o = s.taboption('general', form.DummyValue, '_auto_eui', _('Automatic gateway EUI'));
++  o.cfgvalue=function() { return board.eui || _('Unavailable'); };
++  o = s.taboption('general', form.DummyValue, '_identity', _('Automatic identity source'));
++  o.cfgvalue=function() { return board.eui_source || _('Unavailable'); };
++  o = s.taboption('general', form.DummyValue, '_region', _('Detected region'));
++  o.cfgvalue=function() { return (board.region || 'UNKNOWN') + (board.region_conflict ? ' / conflict' : ''); };
++  o = s.taboption('general', form.ListValue, 'region', _('Hardware region'), _('Only EU is supported. Unknown metadata requires confirmation of the EU enclosure marking. Known non-EU hardware is refused.'));
++  o.value('auto', _('Detect from factory metadata')); o.value('EU', _('EU (confirmed from label)')); o.default='auto'; o.rmempty=false;
 +  o = s.taboption('general', form.Value, 'server', _('Server address')); o.datatype='host'; o.rmempty=false;
 +  ['port_up', 'port_down'].forEach(function(k) { var p=s.taboption('general',form.Value,k,k=='port_up'?_('Uplink UDP port'):_('Downlink UDP port')); p.datatype='port'; p.rmempty=false; });
-+  o = s.taboption('radio', form.Flag, 'tx_enabled', _('Enable downlink transmission'), _('Requires your own calibrated TX gain table in the advanced JSON plan.'));  o.rmempty=false;
++  o = s.taboption('radio', form.Flag, 'tx_enabled', _('Enable downlink transmission'), _('Enabled by default for supported EU hardware; uses the cached factory table or the supplied EU reference table.'));  o.rmempty=false;
 +  o = s.taboption('radio', form.Value, 'antenna_gain', _('Antenna gain (dBi)')); o.datatype='range(0,30)'; o.rmempty=false;
 +  ['radio0_frequency','radio1_frequency'].forEach(function(k) { var p=s.taboption('radio',form.Value,k,k=='radio0_frequency'?_('Radio 0 frequency (Hz)'):_('Radio 1 frequency (Hz)')); p.datatype='range(863000000,870000000)'; p.rmempty=false; });
 +  o = s.taboption('radio', form.Value, 'rssi_offset', _('RSSI offset (dB)')); o.datatype='float'; o.rmempty=false;
-+  o = s.taboption('advanced', form.TextValue, 'advanced', _('Semtech JSON channel plan'), _('Leave empty for the built-in EU868 plan. A full Semtech global configuration can define channels and your calibrated TX gain table; Gateway and Radio settings above override matching fields.'));
++  o = s.taboption('advanced', form.TextValue, 'advanced', _('Semtech JSON channel plan'), _('Leave empty for the built-in EU868 plan. A full Semtech global configuration can define channels and a replacement TX gain table; Gateway and Radio settings above override matching fields.'));
 +  o.rows=24;
 +  var advanced=o;
 +  var template=s.taboption('advanced',form.Button,'_template',_('Built-in channel plan'));
@@ -3212,6 +3328,80 @@ index 0000000..a329ba0
 +  return m.render();
 + }
 +});
+diff --git a/package/utils/femto-lorawan/src/board-info.c b/package/utils/femto-lorawan/src/board-info.c
+new file mode 100644
+index 0000000..6a69866
+--- /dev/null
++++ b/package/utils/femto-lorawan/src/board-info.c
+@@ -0,0 +1,68 @@
++/* SPDX-License-Identifier: GPL-2.0-only
++ * Read-only identity/region/calibration discovery from factory metadata.
++ * This reads the CRC-protected bootloader cache, NOT the live module EEPROM.
++ */
++#include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <fcntl.h>
++#include <unistd.h>
++
++static int mtd_path(const char *name, char path[64]) {
++ FILE *f=fopen("/proc/mtd","r"); char line[256],label[80]; unsigned n,a,b;
++ if(!f)return -1;
++ while(fgets(line,sizeof line,f))
++  if(sscanf(line,"mtd%u: %x %x \"%79[^\"]\"",&n,&a,&b,label)==4 && !strcmp(name,label)) {
++   snprintf(path,64,"/dev/mtd%u",n);fclose(f);return 0;
++  }
++ fclose(f);return -1;
++}
++static uint32_t crc32(const unsigned char *p,size_t n) {
++ uint32_t c=~0u;while(n--){c^=*p++;for(int j=0;j<8;j++)c=(c>>1)^(0xedb88320u & (0u-(c&1)));}return ~c;
++}
++static uint32_t le32(const unsigned char *p) {return p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
++static const char *env_get(const unsigned char *env,const char *key) {
++ size_t len=strlen(key),at=4;
++ while(at<4096 && env[at]) {
++  const unsigned char *end=memchr(env+at,0,4096-at);if(!end)return NULL;
++  if((size_t)(end-env-at)>len && !memcmp(env+at,key,len) && env[at+len]=='=')return (const char*)env+at+len+1;
++  at=(size_t)(end-env)+1;
++ }return NULL;
++}
++static int hex(int c){if(c>='0'&&c<='9')return c-'0';if(c>='a'&&c<='f')return c-'a'+10;if(c>='A'&&c<='F')return c-'A'+10;return -1;}
++static int useful(const unsigned char *p,size_t n){int zero=1,ff=1;for(size_t i=0;i<n;i++){zero&=p[i]==0;ff&=p[i]==255;}return !zero&&!ff;}
++int main(int argc,char **argv) {
++ char config[64]="",factory[64]="";const char *cp=NULL,*fp=NULL;
++ for(int i=1;i<argc;i++) {
++  if(!strcmp(argv[i],"--config") && i+1<argc)cp=argv[++i];
++  else if(!strcmp(argv[i],"--factory") && i+1<argc)fp=argv[++i];
++  else {fprintf(stderr,"usage: femto-board-info [--config Config-data.bin] [--factory Factory-data.bin]\n");return 2;}
++ }
++ if(!cp && !mtd_path("Config",config))cp=config;
++ if(!fp && !mtd_path("Factory",factory))fp=factory;
++ unsigned char env[4096],ee[128],mac[6];int valid=0,have_ee=0,have_mac=0,fd; size_t ee_len=0;
++ if(cp && (fd=open(cp,O_RDONLY))>=0){ssize_t n=pread(fd,env,sizeof env,0);close(fd);valid=n==sizeof env&&crc32(env+4,4092)==le32(env);}
++ if(fp && (fd=open(fp,O_RDONLY))>=0){have_mac=pread(fd,mac,6,4)==6&&useful(mac,6)&&!(mac[0]&1);close(fd);}
++ const char *country=valid?env_get(env,"lora_country_code"):NULL;
++ const char *s=valid?env_get(env,"lora_ee_cnt_0"):NULL;
++ if(s && strlen(s)>=18 && strlen(s)<=256 && !(strlen(s)%2)){ee_len=strlen(s)/2; memset(ee,255,sizeof ee); have_ee=1;for(size_t i=0;i<ee_len;i++){int a=hex(s[i*2]),b=hex(s[i*2+1]);if(a<0||b<0){have_ee=0;break;}ee[i]=(a<<4)|b;}}
++ char eui[17]="";const char *source="unavailable";
++ if(have_ee && useful(ee,8) && useful(ee+2,6)){for(int i=0;i<8;i++)snprintf(eui+i*2,3,"%02X",ee[i]);source="factory-eeprom-cache";}
++ else if(have_mac) {
++  /* Set the local bit; do not XOR it as in IPv6 modified-EUI-64 rules. */
++  snprintf(eui,sizeof eui,"%02X%02X%02XFFFE%02X%02X%02X",(mac[0]|2)&254,mac[1],mac[2],mac[3],mac[4],mac[5]);source="wifi-mac-local";
++ }
++ int band=have_ee?ee[8]:-1;int country_eu=country&&!strcmp(country,"EU");
++ int country_other=country&&(!strcmp(country,"US")||!strcmp(country,"TW")||!strcmp(country,"CN")||!strcmp(country,"AU")||!strcmp(country,"IN")||!strcmp(country,"JP")||!strcmp(country,"KR"));
++ int band_other=band==0||band==2;
++ const char *region=(country_other||band_other)?"NON_EU":(country_eu||band==1)?"EU":"UNKNOWN";
++ int conflict=(country_eu&&band_other)||(country_other&&band==1);
++ printf("{\"eui\":\"%s\",\"eui_source\":\"%s\",\"config_crc_valid\":%s,\"region\":\"%s\",\"region_source\":\"%s\",\"region_conflict\":%s,\"eeprom_band\":",eui,source,valid?"true":"false",region,valid?"bootloader-eeprom-cache":"unavailable",conflict?"true":"false");
++ if(band>=0)printf("%d",band);else printf("null");
++ int lut=have_ee&&ee_len>=80&&ee[14]<=3;
++ for(int i=0;lut&&i<16;i++){const unsigned char *p=ee+16+4*i;double power=(int8_t)p[3]/2.0;lut=p[0]<=3&&p[1]<=3&&p[2]>=8&&p[2]<=15&&power>=-30&&power<=40;}
++ printf(",\"tx_lut\":[");
++ if(lut)for(int i=0;i<16;i++){const unsigned char *p=ee+16+4*i;printf("%s{\"dig_gain\":%u,\"pa_gain\":%u,\"dac_gain\":%u,\"mix_gain\":%u,\"rf_power\":%.1f}",i?",":"",p[0],p[1],ee[14],p[2],(int8_t)p[3]/2.0);}
++ printf("]}\n");return 0;
++}
 diff --git a/package/utils/femto-lorawan/src/probe.c b/package/utils/femto-lorawan/src/probe.c
 new file mode 100644
 index 0000000..d49dc7c
