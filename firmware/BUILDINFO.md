@@ -4,7 +4,8 @@ Build identifier: `public-v2`, prepared 2026-11-14.
 OpenWrt 23.05 branch / Linux 5.15.211, MIPS little-endian 24kc.
 Exact upstream revisions and regeneration commands: `docs/BUILD.md`.
 Matching build configuration and board source: `board/config.build` and
-`board/openwrt.patch`. HAL feed patches: `board/lora-hal-*.patch`.
+`board/openwrt.patch` at Git tag `public-v2` (commit `20f41a1`). HAL feed patches:
+`board/lora-hal-*.patch` at the same tag. Later development source can differ.
 Package versions: `packages.manifest`.
 
 These files were built from source, not exported from a running device.

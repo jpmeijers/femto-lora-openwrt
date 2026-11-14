@@ -12,6 +12,9 @@ Existing components retain their upstream licenses and copyright notices.
 - Semtech `lora_gateway` 5.0.1 and `packet_forwarder`: BSD-3-Clause.
   The packet forwarder source revision and archive SHA256 are in the
   package recipe inside `board/openwrt.patch`.
+- Optional Femto Basic Station: Semtech Basic Station 2.0.6, BSD-3-Clause,
+  with its private LoRa HAL 5.0.1 and upstream Station changes (BSD-3-Clause).
+  The pinned archive hashes and build modifications are in `board/openwrt.patch`.
 - LuCI and other OpenWrt packages retain their own upstream licenses.
   Package source locations, archive hashes and patches are recorded in the
   pinned OpenWrt and feed recipes. See `docs/BUILD.md` for obtaining sources.

@@ -2793,14 +2793,14 @@ index 0000000..94f015e
 +}
 diff --git a/package/utils/femto-lorawan/Makefile b/package/utils/femto-lorawan/Makefile
 new file mode 100644
-index 0000000..9deb453
+index 0000000..08f11fd
 --- /dev/null
 +++ b/package/utils/femto-lorawan/Makefile
 @@ -0,0 +1,36 @@
 +include $(TOPDIR)/rules.mk
 +PKG_NAME:=femto-lorawan
 +PKG_VERSION:=4.0.1
-+PKG_RELEASE:=3
++PKG_RELEASE:=5
 +PKG_SOURCE:=femto-packet-forwarder.tar.gz
 +PKG_SOURCE_URL:=https://codeload.github.com/Lora-net/packet_forwarder/tar.gz/d0226eae6e7b6bbaec6117d0d2372bf17819c438?
 +PKG_HASH:=68921bb22f292cb3a4ee94cef106355709a081e86fceadf2e685d476152fb812
@@ -2835,12 +2835,15 @@ index 0000000..9deb453
 +$(eval $(call BuildPackage,femto-lorawan))
 diff --git a/package/utils/femto-lorawan/files/etc/config/lorawan b/package/utils/femto-lorawan/files/etc/config/lorawan
 new file mode 100644
-index 0000000..c4385fa
+index 0000000..959c4dd
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/config/lorawan
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,16 @@
 +config gateway 'main'
 + option enabled '0'
++ option protocol 'udp'
++ option lns_uri 'wss://eu1.cloud.thethings.network:8887'
++ option lns_key ''
 + option server 'localhost'
 + option port_up '1700'
 + option port_down '1700'
@@ -2862,20 +2865,28 @@ index 0000000..188c9ba
 +EU only; unsupported; no known factory rollback; flash at your own risk.
 diff --git a/package/utils/femto-lorawan/files/etc/init.d/lorawan b/package/utils/femto-lorawan/files/etc/init.d/lorawan
 new file mode 100755
-index 0000000..349c4c3
+index 0000000..3449456
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/init.d/lorawan
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,31 @@
 +#!/bin/sh /etc/rc.common
 +USE_PROCD=1
 +START=95
 +STOP=10
 +start_service() {
-+ local enabled
++ local enabled protocol
 + config_load lorawan
 + config_get_bool enabled main enabled 0
 + [ "$enabled" = 1 ] || return 0
++ config_get protocol main protocol udp
++ if [ "$protocol" = basicstation ] && [ ! -x /usr/sbin/femto-basicstation ]; then
++  logger -t lorawan 'Install femto-basicstation before selecting Basic Station'
++  return 1
++ fi
++ umask 077
++ chmod 600 /etc/config/lorawan
 + mkdir -p /var/run/lorawan
++ chmod 700 /var/run/lorawan
 + /usr/sbin/femto-lora-config || return 1
 + /usr/sbin/femto-lora-reset || return 1
 + procd_open_instance
@@ -2914,25 +2925,26 @@ index 0000000..9094d11
 +exit 0
 diff --git a/package/utils/femto-lorawan/files/etc/uci-defaults/91-femto-lorawan b/package/utils/femto-lorawan/files/etc/uci-defaults/91-femto-lorawan
 new file mode 100755
-index 0000000..7fc19f9
+index 0000000..7097199
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/uci-defaults/91-femto-lorawan
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,7 @@
 +#!/bin/sh
 +uci -q delete ucitrack.@lorawan[-1]
 +uci add ucitrack lorawan >/dev/null
 +uci set ucitrack.@lorawan[-1].init=lorawan
 +uci commit ucitrack
++chmod 600 /etc/config/lorawan
 +exit 0
 diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config
 new file mode 100755
-index 0000000..4a18b58
+index 0000000..f40b6d1
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,58 @@
 +#!/usr/bin/ucode
 +'use strict';
-+import { readfile, writefile, popen } from 'fs';
++import { readfile, writefile, popen, chmod } from 'fs';
 +import { cursor } from 'uci';
 +let u = cursor();
 +let g = u.get_all('lorawan', 'main');
@@ -2960,6 +2972,34 @@ index 0000000..4a18b58
 +c.SX1301_conf.radio_0.rssi_offset = +g.rssi_offset;
 +c.SX1301_conf.radio_1.rssi_offset = +g.rssi_offset;
 +if (!writefile('/var/run/lorawan/global_conf.json', sprintf('%J\n', c))) die('Cannot write runtime configuration\n');
++
++// Basic Station keeps local RF properties; the LNS supplies channel frequencies.
++if ((g.protocol || 'udp') == 'basicstation') {
++ let uri = g.lns_uri || 'wss://eu1.cloud.thethings.network:8887';
++ if (!match(uri, /^wss:\/\/[a-zA-Z0-9.-]+(:[0-9]+)?$/)) die('LNS must be a wss://hostname:port address without a path\n');
++ if (!match(g.lns_key || '', /^[A-Za-z0-9._=-]+$/)) die('Enter a gateway LNS API key in LuCI\n');
++ let trust = readfile('/etc/ssl/certs/ca-certificates.crt');
++ if (!trust) die('System CA bundle is unavailable\n');
++ let rf = { device: '/dev/spidev0.0', pps: false, lorawan_public: true, clksrc: c.SX1301_conf.clksrc, tx_gain_lut: [] };
++ for (let i = 0; i < 2; i++) {
++  let r = c.SX1301_conf['radio_' + i];
++  rf['radio_' + i] = { type: r.type, rssi_offset: r.rssi_offset, tx_enable: r.tx_enable, antenna_gain: +g.antenna_gain };
++ }
++ for (let i = 0; i < 16; i++) {
++  let row = c.SX1301_conf['tx_lut_' + i];
++  if (!row) continue;
++  push(rf.tx_gain_lut, { dig_gain: row.dig_gain, pa_gain: row.pa_gain, dac_gain: row.dac_gain ?? 3, mix_gain: row.mix_gain, rf_power: int(row.rf_power) });
++ }
++ if (!length(rf.tx_gain_lut)) die('Basic Station needs an EU TX gain table\n');
++ chmod('/var/run/lorawan', 0o700);
++ let station = { station_conf: { routerid: eui, euiprefix: '::0', log_level: 'INFO', RADIO_INIT_WAIT: '5s' }, SX1301_conf: rf };
++ if (!writefile('/var/run/lorawan/station.conf', sprintf('%J\n', station)) ||
++     !writefile('/var/run/lorawan/tc.uri', uri + '\n') ||
++     !writefile('/var/run/lorawan/tc.trust', trust) ||
++     !writefile('/var/run/lorawan/tc.key', 'Authorization: Bearer ' + g.lns_key + '\r\n')) die('Cannot write Basic Station runtime files\n');
++ chmod('/var/run/lorawan/tc.key', 0o600);
++}
++else if ((g.protocol || 'udp') != 'udp') die('Unknown forwarder protocol\n');
 diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-lora-reset b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-reset
 new file mode 100755
 index 0000000..35eb320
@@ -2984,13 +3024,23 @@ index 0000000..35eb320
 +sleep 1
 diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-lora-run b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-run
 new file mode 100755
-index 0000000..e24b5fa
+index 0000000..7ecec45
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-run
-@@ -0,0 +1,3 @@
+@@ -0,0 +1,13 @@
 +#!/bin/sh
 +cd /var/run/lorawan || exit 1
-+exec /usr/sbin/lora_pkt_fwd
++. /lib/functions.sh
++config_load lorawan
++config_get protocol main protocol udp
++case "$protocol" in
++ basicstation)
++  export LORAGW_SPI_SPEED=4000000
++  exec /usr/sbin/femto-basicstation --home /var/run/lorawan --temp /var/run/lorawan --radio-init /usr/sbin/femto-lora-reset
++  ;;
++ udp) exec /usr/sbin/lora_pkt_fwd ;;
++ *) echo 'Unknown forwarder protocol' >&2; exit 1 ;;
++esac
 diff --git a/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json b/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json
 new file mode 100644
 index 0000000..5465ac8
@@ -3267,10 +3317,10 @@ index 0000000..a4020fe
 +}
 diff --git a/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/config.js b/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/config.js
 new file mode 100644
-index 0000000..2bb2ff2
+index 0000000..e4d6267
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/config.js
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,64 @@
 +'use strict';
 +'require view';
 +'require form';
@@ -3312,8 +3362,15 @@ index 0000000..2bb2ff2
 +  o.cfgvalue=function() { return (board.region || 'UNKNOWN') + (board.region_conflict ? ' / conflict' : ''); };
 +  o = s.taboption('general', form.ListValue, 'region', _('Hardware region'), _('Only EU is supported. Unknown metadata requires confirmation of the EU enclosure marking. Known non-EU hardware is refused.'));
 +  o.value('auto', _('Detect from factory metadata')); o.value('EU', _('EU (confirmed from label)')); o.default='auto'; o.rmempty=false;
-+  o = s.taboption('general', form.Value, 'server', _('Server address')); o.datatype='host'; o.rmempty=false;
-+  ['port_up', 'port_down'].forEach(function(k) { var p=s.taboption('general',form.Value,k,k=='port_up'?_('Uplink UDP port'):_('Downlink UDP port')); p.datatype='port'; p.rmempty=false; });
++  o = s.taboption('general', form.ListValue, 'protocol', _('Connection protocol'));
++  o.value('udp', _('Semtech UDP')); o.value('basicstation', _('Basic Station (experimental; package required)')); o.default='udp'; o.rmempty=false;
++  o = s.taboption('general', form.Value, 'lns_uri', _('LNS address'), _('For TTN Europe: wss://eu1.cloud.thethings.network:8887. LNS supplies the channel plan.'));
++  o.default='wss://eu1.cloud.thethings.network:8887'; o.rmempty=false;
++  o.validate=function(sid,v) { return /^wss:\/\/[a-zA-Z0-9.-]+(:[0-9]+)?$/.test(v) || _('Use wss://hostname:port without a path'); };
++  o = s.taboption('general', form.Value, 'lns_key', _('LNS API key'), _('Create a gateway API key with Link as Gateway rights in TTN. Enter the key only; keep it private. Requires a valid system clock and trusted CA certificates.'));
++  o.password=true; o.rmempty=true;
++  o = s.taboption('general', form.Value, 'server', _('Server address')); o.datatype='host'; o.rmempty=false; o.depends('protocol','udp'); o.retain=true;
++  ['port_up', 'port_down'].forEach(function(k) { var p=s.taboption('general',form.Value,k,k=='port_up'?_('Uplink UDP port'):_('Downlink UDP port')); p.datatype='port'; p.rmempty=false; p.depends('protocol','udp'); p.retain=true; });
 +  o = s.taboption('radio', form.Flag, 'tx_enabled', _('Enable downlink transmission'), _('Enabled by default for supported EU hardware; uses the cached factory table or the supplied EU reference table.'));  o.rmempty=false;
 +  o = s.taboption('radio', form.Value, 'antenna_gain', _('Antenna gain (dBi)')); o.datatype='range(0,30)'; o.rmempty=false;
 +  ['radio0_frequency','radio1_frequency'].forEach(function(k) { var p=s.taboption('radio',form.Value,k,k=='radio0_frequency'?_('Radio 0 frequency (Hz)'):_('Radio 1 frequency (Hz)')); p.datatype='range(863000000,870000000)'; p.rmempty=false; });
@@ -3419,3 +3476,144 @@ index 0000000..d49dc7c
 + lgw_disconnect();
 + return result!=0 || version!=103;
 +}
+diff --git a/package/utils/femto-basicstation/Makefile b/package/utils/femto-basicstation/Makefile
+new file mode 100644
+index 0000000..e4afa4d
+--- /dev/null
++++ b/package/utils/femto-basicstation/Makefile
+@@ -0,0 +1,40 @@
++# SPDX-License-Identifier: GPL-2.0-only
++include $(TOPDIR)/rules.mk
++PKG_NAME:=femto-basicstation
++PKG_VERSION:=2.0.6
++PKG_RELEASE:=1
++PKG_SOURCE:=basicstation-$(PKG_VERSION).tar.gz
++PKG_SOURCE_URL:=https://codeload.github.com/lorabasics/basicstation/tar.gz/v$(PKG_VERSION)?
++PKG_HASH:=7e285de94bae1174b4c3496fc3ab15fe67c72f92c0693d2320bafc654a9dfb43
++PKG_BUILD_DIR:=$(BUILD_DIR)/femto-basicstation-$(PKG_VERSION)
++define PKG_UNPACK
++	mkdir -p $(PKG_BUILD_DIR)
++	tar -xf $(DL_DIR)/$(PKG_SOURCE) --strip-components=1 -C $(PKG_BUILD_DIR)
++endef
++PKG_LICENSE:=BSD-3-Clause
++PKG_LICENSE_FILES:=LICENSE hal/LICENSE
++PKG_BUILD_DEPENDS:=libloragw
++include $(INCLUDE_DIR)/package.mk
++include $(INCLUDE_DIR)/cmake.mk
++
++define Package/femto-basicstation
++ SECTION:=net
++ CATEGORY:=Network
++ TITLE:=SX1301 Basic Station for Gemtek Femto
++ DEPENDS:=+libmbedtls +libpthread +librt +ca-bundle +femto-lorawan
++ CONFLICTS:=basicstation
++endef
++
++define Build/Prepare
++	$(call Build/Prepare/Default)
++	mkdir -p $(PKG_BUILD_DIR)/hal
++	tar -xf $(DL_DIR)/lora-gateway-hal-5.0.1.tar.gz --strip-components=1 -C $(PKG_BUILD_DIR)/hal
++	$(PATCH) -d $(PKG_BUILD_DIR)/hal -p1 < $(PKG_BUILD_DIR)/deps/lgw/v5.0.1-linux.patch
++	$(PATCH) -d $(PKG_BUILD_DIR)/hal -p1 < ./half-duplex.patch
++endef
++
++define Package/femto-basicstation/install
++	$(INSTALL_DIR) $(1)/usr/sbin
++	$(INSTALL_BIN) $(PKG_BUILD_DIR)/station $(1)/usr/sbin/femto-basicstation
++endef
++$(eval $(call BuildPackage,femto-basicstation))
+diff --git a/package/utils/femto-basicstation/half-duplex.patch b/package/utils/femto-basicstation/half-duplex.patch
+new file mode 100644
+index 0000000..22ae4a8
+--- /dev/null
++++ b/package/utils/femto-basicstation/half-duplex.patch
+@@ -0,0 +1,34 @@
++--- a/libloragw/src/loragw_spi.native.c
+++++ b/libloragw/src/loragw_spi.native.c
++@@ -215,7 +215,7 @@
++     uint8_t out_buf[3];
++     uint8_t command_size;
++     uint8_t in_buf[ARRAY_SIZE(out_buf)];
++-    struct spi_ioc_transfer k;
+++    struct spi_ioc_transfer k[2];
++     int a;
++ 
++     /* check input variables */
++@@ -241,14 +241,14 @@
++ 
++     /* I/O transaction */
++     memset(&k, 0, sizeof(k)); /* clear k */
++-    k.tx_buf = (unsigned long) out_buf;
++-    k.rx_buf = (unsigned long) in_buf;
++-    k.len = command_size;
++-    k.cs_change = 0;
++-    a = ioctl(spi_device, SPI_IOC_MESSAGE(1), &k);
++-
++-    /* determine return code */
++-    if (a != (int)k.len) {
+++    k[0].tx_buf = (unsigned long) out_buf;
+++    k[0].len = command_size - 1;
+++    k[1].rx_buf = (unsigned long) &in_buf[command_size - 1];
+++    k[1].len = 1;
+++    a = ioctl(spi_device, SPI_IOC_MESSAGE(2), k);
+++
+++    /* determine return code */
+++    if (a != command_size) {
++         ERROR_PRINTF("SPI READ FAILURE\n");
++         return LGW_SPI_ERROR;
++     } else {
+diff --git a/package/utils/femto-basicstation/patches/001-musl-time.patch b/package/utils/femto-basicstation/patches/001-musl-time.patch
+new file mode 100644
+index 0000000..f8571d1
+--- /dev/null
++++ b/package/utils/femto-basicstation/patches/001-musl-time.patch
+@@ -0,0 +1,24 @@
++From ca1eb77bf89697e1bacbb21ed7aae8b5134a7bf5 Mon Sep 17 00:00:00 2001
++From: Marcus Schref <mschref@web.de>
++Date: Mon, 22 Aug 2022 10:13:52 +0200
++Subject: [PATCH] basicstation: include sys/time.h
++
++Change time.h include directory to add compatibility with musl and fix
++compilation error
++
++Signed-off-by: Marcus Schref <mschref@web.de>
++---
++ src/aio.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++--- a/src/aio.c
+++++ b/src/aio.c
++@@ -27,7 +27,7 @@
++  */
++ 
++ #include <unistd.h>
++-#include <time.h>
+++#include <sys/time.h>
++ #include <errno.h>
++ #include <fcntl.h>
++ #include "rt.h"
+diff --git a/package/utils/femto-basicstation/src/CMakeLists.txt b/package/utils/femto-basicstation/src/CMakeLists.txt
+new file mode 100644
+index 0000000..e0d0105
+--- /dev/null
++++ b/package/utils/femto-basicstation/src/CMakeLists.txt
+@@ -0,0 +1,19 @@
++cmake_minimum_required(VERSION 3.18)
++project(femto_basicstation C)
++add_compile_definitions(CFG_linux CFG_lgw1 CFG_ral_lgw CFG_no_leds CFG_argp)
++add_compile_definitions(CFG_platform="femto" CFG_variant="std" CFG_version="2.0.6-femto" CFG_commit="ba4f85d" CFG_bdate="reproducible")
++include_directories(src src-linux "${CMAKE_CURRENT_BINARY_DIR}/include")
++file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include")
++file(CREATE_LINK "${CMAKE_CURRENT_SOURCE_DIR}/hal/libloragw/inc" "${CMAKE_CURRENT_BINARY_DIR}/include/lgw" SYMBOLIC)
++file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/hal/libloragw/inc/config.h" "#define LIBLORAGW_VERSION \"5.0.1\"\n#define DEBUG_HAL 0\n#define DEBUG_REG 0\n#define DEBUG_SPI 0\n#define DEBUG_LBT 0\n#define DEBUG_GPS 0\n#define DEBUG_RAD 0\n")
++file(GLOB HAL_SOURCES hal/libloragw/src/*.c)
++list(FILTER HAL_SOURCES EXCLUDE REGEX "loragw_spi\\.ftdi\\.c$")
++add_library(femtohal STATIC ${HAL_SOURCES})
++target_include_directories(femtohal PRIVATE hal/libloragw/inc hal/libloragw)
++target_compile_definitions(femtohal PRIVATE STATIONLOG)
++file(GLOB STATION_SOURCES src/*.c src-linux/*.c)
++list(FILTER STATION_SOURCES EXCLUDE REGEX "station_main\\.c$")
++add_library(stationcore STATIC ${STATION_SOURCES})
++add_executable(station src-linux/station_main.c)
++target_link_libraries(station stationcore femtohal mbedtls mbedx509 mbedcrypto m pthread rt)
++install(TARGETS station RUNTIME DESTINATION sbin)

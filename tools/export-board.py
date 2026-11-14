@@ -17,7 +17,8 @@ files = [
     'package/utils/femto-serial-file/src/serial-file.c',
     'package/utils/femto-serial-file/src/rawdump.c',
 ]
-files += [str(p.relative_to(tree)) for p in sorted((tree / 'package/utils/femto-lorawan').rglob('*')) if p.is_file()]
+for package in ['femto-lorawan', 'femto-basicstation']:
+    files += [str(p.relative_to(tree)) for p in sorted((tree / 'package/utils' / package).rglob('*')) if p.is_file()]
 for name in files:
     result = subprocess.run(['git', 'diff', '--no-index', '--binary', '/dev/null', name], cwd=tree, stdout=subprocess.PIPE)
     assert result.returncode == 1

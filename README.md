@@ -204,6 +204,14 @@ Do not invent a gateway EUI from someone else's label or reuse a published EUI.
 The default server `localhost` is a placeholder, not an Internet service.
 The default upstream ACK timeout is 1000 ms to tolerate longer Internet paths.
 
+## Experimental Basic Station
+
+An optional SX1301 Basic Station package and LuCI protocol controls are available
+in the development source. It supports direct TTN LNS connections over verified
+TLS with a gateway API key. The `public-v2` firmware downloads contain UDP only;
+see [Basic Station build, setup and validation notes](docs/BASIC-STATION.md)
+before installing the experimental packages.
+
 ## Later OpenWrt upgrades
 
 Once this port is already installed, use **System → Backup / Flash Firmware**
