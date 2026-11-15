@@ -104,7 +104,7 @@ firmware. Change to `=m` if you only want an optional IPK. Use a fresh
 OpenWrt preparation directory when changing between project revisions; the
 apply helper deliberately rejects a partially applied older board patch.
 
-The committed `firmware/` binaries are the `public-v4` release artifacts.
+The committed `firmware/` binaries are the `public-v5` release artifacts.
 For their exact corresponding board source/configuration, check out Git tag
-`public-v4` before preparing the build. Development-source changes do not
+`public-v5` before preparing the build. Development-source changes do not
 retroactively change those published binary artifacts.

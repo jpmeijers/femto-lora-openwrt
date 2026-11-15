@@ -3,8 +3,8 @@
 **EU only. Unsupported, at your own risk. No known tested factory rollback.**
 The `public-v3` downloadable firmware includes Basic Station and its LuCI
 controls. Older `public-v2` firmware contains UDP only. Upgrades preserve the
-selected protocol and credentials. New installs have forwarding disabled and
-UDP selected; configure Basic Station in LuCI to use TTN LNS. The two protocols
+selected protocol and credentials. New installs provide setup Wi-Fi, with forwarding disabled and UDP selected;
+configure Basic Station in LuCI to use TTN LNS. The two protocols
 share one concentrator and must not run at the same time.
 
 ## What is implemented

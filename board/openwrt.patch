@@ -1,3 +1,19 @@
+diff --git a/package/base-files/files/etc/rc.button/reset b/package/base-files/files/etc/rc.button/reset
+index 2403122..3925a43 100755
+--- a/package/base-files/files/etc/rc.button/reset
++++ b/package/base-files/files/etc/rc.button/reset
+@@ -1,5 +1,11 @@
+ #!/bin/sh
+ 
++# The Femto port has its own deliberate reset threshold and recovery defaults.
++if [ "$(cat /tmp/sysinfo/board_name 2>/dev/null)" = "gemtek,wlrgfm-100" ] && [ -f /usr/sbin/femto-reset-button ]; then
++ . /usr/sbin/femto-reset-button
++ return $?
++fi
++
+ . /lib/functions.sh
+ 
+ OVERLAY="$( grep ' /overlay ' /proc/mounts )"
 diff --git a/target/linux/ramips/image/mt7620.mk b/target/linux/ramips/image/mt7620.mk
 index f7ef1c4..80da909 100644
 --- a/target/linux/ramips/image/mt7620.mk
@@ -85,12 +101,13 @@ index 34488f9..1d1d281 100644
  DEFAULT_PACKAGES += kmod-rt2800-soc wpad-basic-mbedtls swconfig
 diff --git a/target/linux/ramips/dts/mt7620a_gemtek_wlrgfm-100.dts b/target/linux/ramips/dts/mt7620a_gemtek_wlrgfm-100.dts
 new file mode 100644
-index 0000000..1783c27
+index 0000000..bffaca6
 --- /dev/null
 +++ b/target/linux/ramips/dts/mt7620a_gemtek_wlrgfm-100.dts
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,98 @@
 +#include "mt7620a.dtsi"
 +#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
 +
 +/ {
 + compatible = "gemtek,wlrgfm-100", "ralink,mt7620a-soc";
@@ -103,6 +120,17 @@ index 0000000..1783c27
 +  led-running = &led_power_green;
 +  led-upgrade = &led_power_amber;
 + };
++ keys {
++  compatible = "gpio-keys-polled";
++  poll-interval = <20>;
++  reset {
++   label = "reset";
++   gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
++   linux,code = <KEY_RESTART>;
++   debounce-interval = <60>;
++  };
++ };
++
 + leds {
 +  compatible = "gpio-leds";
 +  led_power_green: power-green { label = "green:power"; gpios = <&gpio2 26 GPIO_ACTIVE_LOW>; default-state = "on"; };
@@ -2568,10 +2596,10 @@ index 0000000..f5f8677
 + 		ret = device_reset(&pdev->dev);
 diff --git a/files/etc/config/network b/files/etc/config/network
 new file mode 100644
-index 0000000..a81876b
+index 0000000..1581165
 --- /dev/null
 +++ b/files/etc/config/network
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,25 @@
 +config interface 'loopback'
 + option device 'lo'
 + option proto 'static'
@@ -2593,6 +2621,10 @@ index 0000000..a81876b
 + option name 'switch0'
 + option reset '1'
 + option enable_vlan '0'
++
++# Present only in new/reset configurations; preserved upgrades have no marker.
++config femto_setup 'femto_defaults'
++ option pending '1'
 diff --git a/package/utils/femto-serial-file/Makefile b/package/utils/femto-serial-file/Makefile
 new file mode 100644
 index 0000000..600313f
@@ -2812,14 +2844,14 @@ index 0000000..94f015e
 +}
 diff --git a/package/utils/femto-lorawan/Makefile b/package/utils/femto-lorawan/Makefile
 new file mode 100644
-index 0000000..acb0223
+index 0000000..88df45b
 --- /dev/null
 +++ b/package/utils/femto-lorawan/Makefile
 @@ -0,0 +1,37 @@
 +include $(TOPDIR)/rules.mk
 +PKG_NAME:=femto-lorawan
 +PKG_VERSION:=4.0.1
-+PKG_RELEASE:=6
++PKG_RELEASE:=7
 +PKG_SOURCE:=femto-packet-forwarder.tar.gz
 +PKG_SOURCE_URL:=https://codeload.github.com/Lora-net/packet_forwarder/tar.gz/d0226eae6e7b6bbaec6117d0d2372bf17819c438?
 +PKG_HASH:=68921bb22f292cb3a4ee94cef106355709a081e86fceadf2e685d476152fb812
@@ -2886,11 +2918,11 @@ index 0000000..959c4dd
 + option advanced ''
 diff --git a/package/utils/femto-lorawan/files/etc/femto-release b/package/utils/femto-lorawan/files/etc/femto-release
 new file mode 100644
-index 0000000..bbc21d3
+index 0000000..4716d03
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/femto-release
 @@ -0,0 +1,2 @@
-+Gemtek WLRGFM-100 experimental OpenWrt port: public-v4
++Gemtek WLRGFM-100 experimental OpenWrt port: public-v5
 +EU only; unsupported; no known factory rollback; flash at your own risk.
 diff --git a/package/utils/femto-lorawan/files/etc/init.d/femto-leds b/package/utils/femto-lorawan/files/etc/init.d/femto-leds
 new file mode 100755
@@ -2988,6 +3020,14 @@ index 0000000..a912fc5
 +uci commit ucitrack
 +chmod 600 /etc/config/lorawan
 +exit 0
+diff --git a/package/utils/femto-lorawan/files/etc/uci-defaults/92-femto-setup b/package/utils/femto-lorawan/files/etc/uci-defaults/92-femto-setup
+new file mode 100755
+index 0000000..139b259
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/etc/uci-defaults/92-femto-setup
+@@ -0,0 +1,2 @@
++#!/bin/sh
++/usr/sbin/femto-setup-defaults
 diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-leds b/package/utils/femto-lorawan/files/usr/sbin/femto-leds
 new file mode 100755
 index 0000000..1eb6b97
@@ -3202,6 +3242,101 @@ index 0000000..7ecec45
 + udp) exec /usr/sbin/lora_pkt_fwd ;;
 + *) echo 'Unknown forwarder protocol' >&2; exit 1 ;;
 +esac
+diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-reset-button b/package/utils/femto-lorawan/files/usr/sbin/femto-reset-button
+new file mode 100755
+index 0000000..2fffb91
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/usr/sbin/femto-reset-button
+@@ -0,0 +1,31 @@
++#!/bin/sh
++# SPDX-License-Identifier: GPL-2.0-only
++# Sourced by rc.button/reset only on this board. Reset only the OpenWrt overlay.
++overlay_ready() { grep -qs ' /overlay ' /proc/mounts; }
++case "$ACTION" in
++ pressed)
++  overlay_ready || return 0
++  return 10
++  ;;
++ timeout)
++  overlay_ready || return 0
++  . /etc/diag.sh
++  set_state failsafe
++  logger -t femto-reset 'Reset armed: release button to erase OpenWrt settings'
++  ;;
++ released)
++  case "$SEEN" in ''|*[!0-9]*) return 0;; esac
++  if [ "$SEEN" -ge 10 ]; then
++   overlay_ready || return 0
++   logger -t femto-reset 'Erasing OpenWrt settings; booting setup access point'
++   jffs2reset -y && reboot
++  elif [ "$SEEN" -lt 1 ]; then
++   sync
++   reboot
++  else
++   . /etc/diag.sh
++   set_state done
++  fi
++  ;;
++esac
++return 0
+diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-setup-defaults b/package/utils/femto-lorawan/files/usr/sbin/femto-setup-defaults
+new file mode 100755
+index 0000000..43135e4
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/usr/sbin/femto-setup-defaults
+@@ -0,0 +1,52 @@
++#!/bin/sh
++# SPDX-License-Identifier: GPL-2.0-only
++# Run only for a new/reset ROM network configuration, never preserved upgrades.
++set -eu
++[ "$(uci -q get network.femto_defaults.pending)" = 1 ] || exit 0
++wifi config
++# Keep the pending marker if Wi-Fi initialization must be retried on next boot.
++uci -q get wireless.radio0 >/dev/null || exit 1
++mac=$(cat /sys/class/ieee80211/phy0/macaddress 2>/dev/null | tr -cd '0-9a-fA-F')
++ssid=Femto-Setup
++[ "${#mac}" != 12 ] || ssid="Femto-Setup-$(printf %s "$mac" | tail -c 6)"
++uci -q delete wireless.default_radio0 || true
++uci -q batch <<EOF
++set wireless.radio0.disabled='0'
++set wireless.radio0.channel='6'
++set wireless.radio0.htmode='HT20'
++set wireless.femto_setup='wifi-iface'
++set wireless.femto_setup.device='radio0'
++set wireless.femto_setup.mode='ap'
++set wireless.femto_setup.network='setup'
++set wireless.femto_setup.ssid='$ssid'
++set wireless.femto_setup.encryption='none'
++set wireless.femto_setup.isolate='1'
++set wireless.femto_setup.disabled='0'
++set network.setup_bridge='device'
++set network.setup_bridge.name='br-setup'
++set network.setup_bridge.type='bridge'
++set network.setup='interface'
++set network.setup.device='br-setup'
++set network.setup.proto='static'
++set network.setup.ipaddr='192.168.89.1'
++set network.setup.netmask='255.255.255.0'
++set dhcp.lan.ignore='1'
++set dhcp.setup='dhcp'
++set dhcp.setup.interface='setup'
++set dhcp.setup.start='100'
++set dhcp.setup.limit='50'
++set dhcp.setup.leasetime='1h'
++set dhcp.setup.ignore='0'
++add_list dhcp.setup.dhcp_option='3'
++set firewall.femto_setup='zone'
++set firewall.femto_setup.name='setup'
++add_list firewall.femto_setup.network='setup'
++set firewall.femto_setup.input='ACCEPT'
++set firewall.femto_setup.output='ACCEPT'
++set firewall.femto_setup.forward='REJECT'
++EOF
++uci commit wireless
++uci commit dhcp
++uci commit firewall
++uci -q delete network.femto_defaults
++uci commit network
 diff --git a/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json b/package/utils/femto-lorawan/files/usr/share/lorawan/eu868.json
 new file mode 100644
 index 0000000..5465ac8

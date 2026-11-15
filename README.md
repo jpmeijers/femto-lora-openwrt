@@ -20,12 +20,13 @@ The base is a pinned OpenWrt 23.05 branch with Linux 5.15; it is not an official
 supported OpenWrt device or a commitment to ongoing security maintenance.
 
 Ethernet, persistent configuration, Wi-Fi station association/DHCP/DNS, Wi-Fi AP
-beaconing/scanning, LoRa initialization, UDP gateway-server acknowledgments,
+association/DHCP/LuCI access, scanning, LoRa initialization, UDP gateway-server acknowledgments,
 LuCI settings, web upgrades and normal reboot have been exercised on one unit.
 Only **EU variants are supported**. The image recovers the LoRa EUI and gain
 table from valid factory cache data when available. Otherwise it generates a
 locally administered EUI from the factory Wi-Fi MAC and uses the included EU
-reference gain table. Wi-Fi and forwarding start disabled; **downlinks default
+reference gain table. Fresh installs provide open setup Wi-Fi; forwarding is
+disabled until configured. **Downlinks default
 to enabled** once forwarding is configured. Known non-EU units are refused;
 unknown units require explicit EU confirmation in LuCI.
 RF power, receiver sensitivity,
@@ -131,7 +132,7 @@ python3 tools/linux_serial_transfer.py put tools/install-from-ram.sh /tmp/instal
 You can instead transfer the same files over a working Ethernet/SSH link.
 The RAM LAN address is `192.168.88.10/24`; give your computer a different static
 address in that subnet, with no gateway on this dedicated link. There is no
-DHCP server by default. On a NetworkManager host you can create a dedicated
+DHCP server on Ethernet by default. On a NetworkManager host you can create a dedicated
 profile (replace the example interface with your wired adapter):
 
 ```sh
@@ -182,7 +183,8 @@ From the console, `readlink /overlay/.fs_state` should eventually print `2`.
 
 ### 6. Configure through LuCI
 
-Open **http://192.168.88.10/** over Ethernet. HTTPS is also available with a
+For a fresh/reset installation, join **Femto-Setup-…** and open
+**http://192.168.89.1/**. Alternatively use **http://192.168.88.10/** over Ethernet. HTTPS is also available with a
 self-signed certificate. Initially log in as **root**, with an empty password,
 and set a password immediately under **System → Administration**.
 
@@ -206,7 +208,7 @@ The default upstream ACK timeout is 1000 ms to tolerate longer Internet paths.
 
 ## Experimental Basic Station
 
-The `public-v4` firmware includes SX1301 Basic Station and LuCI protocol controls.
+The `public-v5` firmware includes SX1301 Basic Station and LuCI protocol controls.
 It supports direct TTN LNS connections over verified TLS with a gateway API key.
 Choose **Basic Station** under **Services → LoRaWAN**, enter your LNS address
 and gateway API key, then enable forwarding. See [Basic Station setup and
@@ -216,10 +218,20 @@ forwarding disabled and UDP selected until you configure a connection.
 
 ## Enclosure LEDs
 
-The `public-v4` firmware controls the power, Internet, Wi-Fi and LoRa indicators.
+The `public-v5` firmware controls the power, Internet, Wi-Fi and LoRa indicators.
 Green means ready; amber means enabled but not ready; disabled Wi-Fi/LoRa are off.
 Configure automatic behavior under **System → Gateway LEDs**. See
 [LED mapping and status definitions](docs/LEDS.md).
+
+## Reset-button recovery
+
+If a bad configuration locks you out, hold the rear reset button for **10–12
+seconds until power flashes amber**, then release it. The gateway clears its
+OpenWrt configuration and reboots into the open `Femto-Setup-…` Wi-Fi network,
+with DHCP and LuCI at **192.168.89.1**. Ethernet recovery stays at **192.168.88.10**.
+A quick tap reboots; intermediate holds are ignored. Set an admin password and
+secure or disable the setup AP after configuring the gateway. See
+[full recovery steps and what is erased](docs/RECOVERY.md).
 
 ## Later OpenWrt upgrades
 

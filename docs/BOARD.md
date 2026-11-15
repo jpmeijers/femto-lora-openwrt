@@ -49,7 +49,7 @@ example subnet in the README, without a DHCP server or upstream route.
 Factory Wi-Fi calibration is read from this gateway's own Factory partition.
 Ethernet derives its address from that partition too; none is embedded in the
 published source or firmware. rt2800 can emit an RXIQ calibration warning and
-fall back to default corrections. AP beaconing, passive receive scanning and
+fall back to default corrections. AP association, setup DHCP/LuCI access, passive receive scanning and
 station IP traffic worked; sensitivity, throughput, and all security/AP modes
 have not been characterized. PCIe and SD remain disabled. USB controllers
 initialize, but attached USB peripherals are not validated.
