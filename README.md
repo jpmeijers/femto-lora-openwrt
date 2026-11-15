@@ -206,13 +206,20 @@ The default upstream ACK timeout is 1000 ms to tolerate longer Internet paths.
 
 ## Experimental Basic Station
 
-The `public-v3` firmware includes SX1301 Basic Station and LuCI protocol controls.
+The `public-v4` firmware includes SX1301 Basic Station and LuCI protocol controls.
 It supports direct TTN LNS connections over verified TLS with a gateway API key.
 Choose **Basic Station** under **Services → LoRaWAN**, enter your LNS address
 and gateway API key, then enable forwarding. See [Basic Station setup and
 validation notes](docs/BASIC-STATION.md). UDP remains available and existing
 protocol/settings are preserved on upgrade. New installations start with
 forwarding disabled and UDP selected until you configure a connection.
+
+## Enclosure LEDs
+
+The `public-v4` firmware controls the power, Internet, Wi-Fi and LoRa indicators.
+Green means ready; amber means enabled but not ready; disabled Wi-Fi/LoRa are off.
+Configure automatic behavior under **System → Gateway LEDs**. See
+[LED mapping and status definitions](docs/LEDS.md).
 
 ## Later OpenWrt upgrades
 

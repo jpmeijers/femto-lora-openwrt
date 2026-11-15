@@ -14,6 +14,7 @@ Existing components retain their upstream licenses and copyright notices.
   package recipe inside `board/openwrt.patch`.
 - Optional Femto Basic Station: Semtech Basic Station 2.0.6, BSD-3-Clause,
   with its private LoRa HAL 5.0.1 and upstream Station changes (BSD-3-Clause).
+  The added credential-free radio health marker glue is GPL-2.0-only.
   The pinned archive hashes and build modifications are in `board/openwrt.patch`.
 - LuCI and other OpenWrt packages retain their own upstream licenses.
   Package source locations, archive hashes and patches are recorded in the

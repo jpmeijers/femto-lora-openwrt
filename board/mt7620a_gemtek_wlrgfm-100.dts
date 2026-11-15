@@ -1,10 +1,29 @@
 #include "mt7620a.dtsi"
+#include <dt-bindings/gpio/gpio.h>
 
 / {
  compatible = "gemtek,wlrgfm-100", "ralink,mt7620a-soc";
  model = "Gemtek WLRGFM-100 (Femto)";
  memory@0 { device_type = "memory"; reg = <0x0 0x10000000>; };
  chosen { bootargs = "console=ttyS0,57600 root=/dev/ubiblock0_0 rootfstype=squashfs"; };
+ aliases {
+  led-boot = &led_power_green;
+  led-failsafe = &led_power_amber;
+  led-running = &led_power_green;
+  led-upgrade = &led_power_amber;
+ };
+ leds {
+  compatible = "gpio-leds";
+  led_power_green: power-green { label = "green:power"; gpios = <&gpio2 26 GPIO_ACTIVE_LOW>; default-state = "on"; };
+  led_power_amber: power-amber { label = "amber:power"; gpios = <&gpio2 30 GPIO_ACTIVE_LOW>; };
+  internet-green { label = "green:internet"; gpios = <&gpio2 27 GPIO_ACTIVE_LOW>; };
+  internet-amber { label = "amber:internet"; gpios = <&gpio2 28 GPIO_ACTIVE_LOW>; };
+  wifi-green { label = "green:wifi"; gpios = <&gpio0 8 GPIO_ACTIVE_LOW>; };
+  wifi-amber { label = "amber:wifi"; gpios = <&gpio0 10 GPIO_ACTIVE_LOW>; };
+  lora-green { label = "green:lora"; gpios = <&gpio0 9 GPIO_ACTIVE_LOW>; };
+  lora-amber { label = "amber:lora"; gpios = <&gpio0 7 GPIO_ACTIVE_LOW>; };
+ };
+
 };
 
 &palmbus {
@@ -63,5 +82,5 @@
 &ohci { status = "okay"; };
 
 &state_default {
- gpio { groups = "rgmii1", "rgmii2"; function = "gpio"; };
+ gpio { groups = "rgmii1", "rgmii2", "uartf"; function = "gpio"; };
 };

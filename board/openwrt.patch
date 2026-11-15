@@ -85,17 +85,36 @@ index 34488f9..1d1d281 100644
  DEFAULT_PACKAGES += kmod-rt2800-soc wpad-basic-mbedtls swconfig
 diff --git a/target/linux/ramips/dts/mt7620a_gemtek_wlrgfm-100.dts b/target/linux/ramips/dts/mt7620a_gemtek_wlrgfm-100.dts
 new file mode 100644
-index 0000000..834bdb0
+index 0000000..1783c27
 --- /dev/null
 +++ b/target/linux/ramips/dts/mt7620a_gemtek_wlrgfm-100.dts
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,86 @@
 +#include "mt7620a.dtsi"
++#include <dt-bindings/gpio/gpio.h>
 +
 +/ {
 + compatible = "gemtek,wlrgfm-100", "ralink,mt7620a-soc";
 + model = "Gemtek WLRGFM-100 (Femto)";
 + memory@0 { device_type = "memory"; reg = <0x0 0x10000000>; };
 + chosen { bootargs = "console=ttyS0,57600 root=/dev/ubiblock0_0 rootfstype=squashfs"; };
++ aliases {
++  led-boot = &led_power_green;
++  led-failsafe = &led_power_amber;
++  led-running = &led_power_green;
++  led-upgrade = &led_power_amber;
++ };
++ leds {
++  compatible = "gpio-leds";
++  led_power_green: power-green { label = "green:power"; gpios = <&gpio2 26 GPIO_ACTIVE_LOW>; default-state = "on"; };
++  led_power_amber: power-amber { label = "amber:power"; gpios = <&gpio2 30 GPIO_ACTIVE_LOW>; };
++  internet-green { label = "green:internet"; gpios = <&gpio2 27 GPIO_ACTIVE_LOW>; };
++  internet-amber { label = "amber:internet"; gpios = <&gpio2 28 GPIO_ACTIVE_LOW>; };
++  wifi-green { label = "green:wifi"; gpios = <&gpio0 8 GPIO_ACTIVE_LOW>; };
++  wifi-amber { label = "amber:wifi"; gpios = <&gpio0 10 GPIO_ACTIVE_LOW>; };
++  lora-green { label = "green:lora"; gpios = <&gpio0 9 GPIO_ACTIVE_LOW>; };
++  lora-amber { label = "amber:lora"; gpios = <&gpio0 7 GPIO_ACTIVE_LOW>; };
++ };
++
 +};
 +
 +&palmbus {
@@ -154,7 +173,7 @@ index 0000000..834bdb0
 +&ohci { status = "okay"; };
 +
 +&state_default {
-+ gpio { groups = "rgmii1", "rgmii2"; function = "gpio"; };
++ gpio { groups = "rgmii1", "rgmii2", "uartf"; function = "gpio"; };
 +};
 diff --git a/target/linux/ramips/files/drivers/mtd/maps/ralink_nand.c b/target/linux/ramips/files/drivers/mtd/maps/ralink_nand.c
 new file mode 100644
@@ -2793,14 +2812,14 @@ index 0000000..94f015e
 +}
 diff --git a/package/utils/femto-lorawan/Makefile b/package/utils/femto-lorawan/Makefile
 new file mode 100644
-index 0000000..08f11fd
+index 0000000..acb0223
 --- /dev/null
 +++ b/package/utils/femto-lorawan/Makefile
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,37 @@
 +include $(TOPDIR)/rules.mk
 +PKG_NAME:=femto-lorawan
 +PKG_VERSION:=4.0.1
-+PKG_RELEASE:=5
++PKG_RELEASE:=6
 +PKG_SOURCE:=femto-packet-forwarder.tar.gz
 +PKG_SOURCE_URL:=https://codeload.github.com/Lora-net/packet_forwarder/tar.gz/d0226eae6e7b6bbaec6117d0d2372bf17819c438?
 +PKG_HASH:=68921bb22f292cb3a4ee94cef106355709a081e86fceadf2e685d476152fb812
@@ -2812,16 +2831,17 @@ index 0000000..08f11fd
 + SECTION:=net
 + CATEGORY:=Network
 + TITLE:=Gemtek Femto LoRaWAN forwarder and LuCI controls
-+ DEPENDS:=+libloragw +libpthread +librt +ucode +ucode-mod-fs +ucode-mod-uci +luci-base
++ DEPENDS:=+libloragw +libpthread +librt +ucode +ucode-mod-fs +ucode-mod-uci +ucode-mod-ubus +luci-base
 +endef
 +
 +define Package/femto-lorawan/conffiles
 +/etc/config/lorawan
++/etc/config/femto-leds
 +endef
 +
 +define Build/Compile
-+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -I$(STAGING_DIR)/usr/include/libloragw -I$(PKG_BUILD_DIR)/lora_pkt_fwd/inc -DVERSION_STRING='"4.0.1"' $(PKG_BUILD_DIR)/lora_pkt_fwd/src/*.c $(TARGET_LDFLAGS) -lloragw -lrt -lpthread -lm -o $(PKG_BUILD_DIR)/lora_pkt_fwd/lora_pkt_fwd
-+	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -I$(STAGING_DIR)/usr/include/libloragw ./src/probe.c $(TARGET_LDFLAGS) -lloragw -o $(PKG_BUILD_DIR)/femto-lora-probe
++	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -I./src -I$(STAGING_DIR)/usr/include/libloragw -I$(PKG_BUILD_DIR)/lora_pkt_fwd/inc -DVERSION_STRING='"4.0.1"' $(PKG_BUILD_DIR)/lora_pkt_fwd/src/*.c $(TARGET_LDFLAGS) -lloragw -lrt -lpthread -lm -o $(PKG_BUILD_DIR)/lora_pkt_fwd/lora_pkt_fwd
++	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) -I./src -I$(STAGING_DIR)/usr/include/libloragw ./src/probe.c $(TARGET_LDFLAGS) -lloragw -o $(PKG_BUILD_DIR)/femto-lora-probe
 +	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_CPPFLAGS) ./src/board-info.c $(TARGET_LDFLAGS) -o $(PKG_BUILD_DIR)/femto-board-info
 +endef
 +
@@ -2833,6 +2853,15 @@ index 0000000..08f11fd
 +	$(INSTALL_BIN) $(PKG_BUILD_DIR)/femto-board-info $(1)/usr/sbin/
 +endef
 +$(eval $(call BuildPackage,femto-lorawan))
+diff --git a/package/utils/femto-lorawan/files/etc/config/femto-leds b/package/utils/femto-lorawan/files/etc/config/femto-leds
+new file mode 100644
+index 0000000..1371e03
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/etc/config/femto-leds
+@@ -0,0 +1,3 @@
++config indicators 'main'
++ option enabled '1'
++ option probe_host '1.1.1.1'
 diff --git a/package/utils/femto-lorawan/files/etc/config/lorawan b/package/utils/femto-lorawan/files/etc/config/lorawan
 new file mode 100644
 index 0000000..959c4dd
@@ -2857,12 +2886,31 @@ index 0000000..959c4dd
 + option advanced ''
 diff --git a/package/utils/femto-lorawan/files/etc/femto-release b/package/utils/femto-lorawan/files/etc/femto-release
 new file mode 100644
-index 0000000..8de2ae6
+index 0000000..bbc21d3
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/femto-release
 @@ -0,0 +1,2 @@
-+Gemtek WLRGFM-100 experimental OpenWrt port: public-v3
++Gemtek WLRGFM-100 experimental OpenWrt port: public-v4
 +EU only; unsupported; no known factory rollback; flash at your own risk.
+diff --git a/package/utils/femto-lorawan/files/etc/init.d/femto-leds b/package/utils/femto-lorawan/files/etc/init.d/femto-leds
+new file mode 100755
+index 0000000..2e24784
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/etc/init.d/femto-leds
+@@ -0,0 +1,13 @@
++#!/bin/sh /etc/rc.common
++USE_PROCD=1
++START=96
++STOP=9
++start_service() {
++ procd_open_instance
++ procd_set_param command /usr/sbin/femto-leds
++ procd_set_param stdout 1
++ procd_set_param stderr 1
++ procd_set_param respawn 3600 5 3
++ procd_close_instance
++}
++service_triggers() { procd_add_reload_trigger femto-leds; }
 diff --git a/package/utils/femto-lorawan/files/etc/init.d/lorawan b/package/utils/femto-lorawan/files/etc/init.d/lorawan
 new file mode 100755
 index 0000000..3449456
@@ -2925,17 +2973,130 @@ index 0000000..9094d11
 +exit 0
 diff --git a/package/utils/femto-lorawan/files/etc/uci-defaults/91-femto-lorawan b/package/utils/femto-lorawan/files/etc/uci-defaults/91-femto-lorawan
 new file mode 100755
-index 0000000..7097199
+index 0000000..a912fc5
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/etc/uci-defaults/91-femto-lorawan
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,11 @@
 +#!/bin/sh
 +uci -q delete ucitrack.@lorawan[-1]
 +uci add ucitrack lorawan >/dev/null
 +uci set ucitrack.@lorawan[-1].init=lorawan
 +uci commit ucitrack
++uci -q delete ucitrack.@femto-leds[-1]
++uci add ucitrack femto-leds >/dev/null
++uci set ucitrack.@femto-leds[-1].init=femto-leds
++uci commit ucitrack
 +chmod 600 /etc/config/lorawan
 +exit 0
+diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-leds b/package/utils/femto-lorawan/files/usr/sbin/femto-leds
+new file mode 100755
+index 0000000..1eb6b97
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/usr/sbin/femto-leds
+@@ -0,0 +1,103 @@
++#!/usr/bin/ucode
++'use strict';
++import { readfile, writefile, readlink, lsdir, popen } from 'fs';
++import { cursor } from 'uci';
++import { connect } from 'ubus';
++
++function readjson(path) {
++ try { return json(readfile(path) || '{}'); } catch (e) { return {}; }
++}
++function owned_connection(pid) {
++ let inodes = {};
++ for (let fd in lsdir('/proc/' + pid + '/fd') || []) {
++  let m = match(readlink('/proc/' + pid + '/fd/' + fd) || '', /^socket:\[(\d+)\]$/);
++  if (m) inodes[m[1]] = true;
++ }
++ for (let path in ['/proc/net/tcp', '/proc/net/tcp6']) {
++  for (let line in split(readfile(path) || '', '\n')) {
++   let fields = split(trim(line), /\s+/);
++   if (fields[3] == '01' && inodes[fields[9]]) return true;
++  }
++ }
++ return false;
++}
++function marker(kind, exe) {
++ let m = readjson('/var/run/lorawan/' + kind + '.json');
++ if (!m.active || type(m.pid) != 'int' || m.pid <= 1) return null;
++ let path = readlink('/proc/' + m.pid + '/exe') || '';
++ return path == '/usr/sbin/' + exe ? m : null;
++}
++function status() {
++ let u = cursor();
++ let enabled = u.get('femto-leds', 'main', 'enabled') != '0';
++ let now = int(+split(readfile('/proc/uptime'), ' ')[0]);
++ let radio = u.get('lorawan', 'main', 'enabled') == '1';
++ let protocol = u.get('lorawan', 'main', 'protocol') || 'udp';
++ let ready = false;
++ if (radio && protocol == 'basicstation') {
++  let link = marker('station-link', 'femto-basicstation');
++  let rf = marker('station-radio', 'femto-basicstation');
++  ready = !!(link && rf && link.pid == rf.pid && rf.since >= link.since && owned_connection(link.pid));
++ }
++ else if (radio && protocol == 'udp') {
++  let rf = marker('udp-radio', 'lora_pkt_fwd');
++  for (let kind in ['udp-pull-ack', 'udp-push-ack']) {
++   let ack = marker(kind, 'lora_pkt_fwd');
++   if (rf && ack && ack.pid == rf.pid && now >= ack.since && now - ack.since <= 90) ready = true;
++  }
++ }
++ let wifi_enabled = false, wifi_ready = false;
++ let bus = connect();
++ let wireless = bus ? bus.call('network.wireless', 'status', {}) : {};
++ if (bus) bus.disconnect();
++ for (let name, r in wireless || {}) {
++  if (r.disabled) continue;
++  wifi_enabled = true;
++  for (let iface in r.interfaces || []) {
++   let ifname = iface.ifname || '';
++   if (!match(ifname, /^[A-Za-z0-9_.:-]+$/)) continue;
++   let oper = trim(readfile('/sys/class/net/' + ifname + '/operstate') || '');
++   if (oper == 'up' || (r.up && iface.config?.mode == 'ap')) wifi_ready = true;
++  }
++ }
++ let internet = ready;
++ // An authenticated active LNS link or fresh UDP ACK already proves upstream reachability.
++ // Otherwise probe at most every 30 seconds; never place configuration in shell code unchecked.
++ if (!internet && enabled) {
++  let host = u.get('femto-leds', 'main', 'probe_host') || '';
++  if (match(host, /^[A-Za-z0-9][A-Za-z0-9.-]*$/)) {
++   let cache = readjson('/var/run/femto-leds-probe.json');
++   if (cache.host != host || now < cache.since || now - cache.since >= 30) {
++    let proc = popen("ping -c 1 -W 1 '" + host + "' >/dev/null 2>&1", 'r');
++    if (proc) proc.read('all');
++    cache = { host, since: now, reachable: proc ? proc.close() == 0 : false };
++    writefile('/var/run/femto-leds-probe.json', sprintf('%J\n', cache));
++   }
++   internet = !!cache.reachable;
++  }
++ }
++ return { enabled, internet: internet ? 'green' : 'amber', wifi: !wifi_enabled ? 'off' : wifi_ready ? 'green' : 'amber', lora: !radio ? 'off' : ready ? 'green' : 'amber' };
++}
++function apply(s) {
++ if (!s.enabled) return;
++ for (let icon in ['internet', 'wifi', 'lora']) {
++  let wanted = s[icon];
++  // Turn the opposite colour off first, avoiding mixed-colour transients.
++  for (let colour in wanted == 'green' ? ['amber', 'green'] : ['green', 'amber']) {
++   let path = '/sys/class/leds/' + colour + ':' + icon;
++   let brightness = wanted == colour ? '1' : '0';
++   if (!match(readfile(path + '/trigger') || '', /\[none\]/)) writefile(path + '/trigger', 'none');
++   if (trim(readfile(path + '/brightness') || '') != brightness) {
++    writefile(path + '/brightness', brightness);
++   }
++  }
++ }
++}
++let once = ARGV[0] == '--once' || ARGV[0] == '--status';
++while (true) {
++ let s = status();
++ if (ARGV[0] != '--status') apply(s);
++ writefile('/var/run/femto-leds-status.json', sprintf('%J\n', s));
++ if (once) { print(sprintf('%J\n', s)); break; }
++ sleep(5000);
++}
 diff --git a/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config b/package/utils/femto-lorawan/files/usr/sbin/femto-lora-config
 new file mode 100755
 index 0000000..f40b6d1
@@ -3258,10 +3419,10 @@ index 0000000..5465ac8
 +}
 diff --git a/package/utils/femto-lorawan/files/usr/share/luci/menu.d/luci-app-lorawan.json b/package/utils/femto-lorawan/files/usr/share/luci/menu.d/luci-app-lorawan.json
 new file mode 100644
-index 0000000..07f421b
+index 0000000..2ce3907
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/share/luci/menu.d/luci-app-lorawan.json
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,34 @@
 +{
 +  "admin/services/lorawan": {
 +    "title": "LoRaWAN",
@@ -3278,21 +3439,37 @@ index 0000000..07f421b
 +        "lorawan": true
 +      }
 +    }
++  },
++  "admin/system/femto_leds": {
++    "title": "Gateway LEDs",
++    "order": 65,
++    "action": {
++      "type": "view",
++      "path": "lorawan/leds"
++    },
++    "depends": {
++      "acl": [
++        "luci-app-lorawan"
++      ],
++      "uci": {
++        "femto-leds": true
++      }
++    }
 +  }
 +}
-\ No newline at end of file
 diff --git a/package/utils/femto-lorawan/files/usr/share/rpcd/acl.d/luci-app-lorawan.json b/package/utils/femto-lorawan/files/usr/share/rpcd/acl.d/luci-app-lorawan.json
 new file mode 100644
-index 0000000..a4020fe
+index 0000000..3ffc95e
 --- /dev/null
 +++ b/package/utils/femto-lorawan/files/usr/share/rpcd/acl.d/luci-app-lorawan.json
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,33 @@
 +{
 +  "luci-app-lorawan": {
 +    "description": "Manage the Femto LoRaWAN concentrator",
 +    "read": {
 +      "uci": [
-+        "lorawan"
++        "lorawan",
++        "femto-leds"
 +      ],
 +      "ubus": {
 +        "service": [
@@ -3305,12 +3482,16 @@ index 0000000..a4020fe
 +        ],
 +        "/usr/sbin/femto-board-info": [
 +          "exec"
++        ],
++        "/var/run/femto-leds-status.json": [
++          "read"
 +        ]
 +      }
 +    },
 +    "write": {
 +      "uci": [
-+        "lorawan"
++        "lorawan",
++        "femto-leds"
 +      ]
 +    }
 +  }
@@ -3385,6 +3566,73 @@ index 0000000..e4d6267
 +  return m.render();
 + }
 +});
+diff --git a/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/leds.js b/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/leds.js
+new file mode 100644
+index 0000000..ef291fd
+--- /dev/null
++++ b/package/utils/femto-lorawan/files/www/luci-static/resources/view/lorawan/leds.js
+@@ -0,0 +1,17 @@
++'use strict';
++'require view';
++'require form';
++'require fs';
++return view.extend({
++ load: function() { return fs.read('/var/run/femto-leds-status.json').then(JSON.parse).catch(function() { return {}; }); },
++ render: function(state) {
++  var m = new form.Map('femto-leds', _('Gateway LEDs'), _('Automatic enclosure indicators: green means ready, amber means configured but not ready, and off means disabled. Disabling automatic control allows custom settings under System → LED Configuration.'));
++  var s = m.section(form.NamedSection, 'main', 'indicators');
++  var o = s.option(form.Flag,'enabled',_('Automatic status indicators')); o.rmempty=false; o.default='1';
++  o = s.option(form.Value,'probe_host',_('Internet probe host'),_('An IPv4 address or hostname to ping at most every 30 seconds when no confirmed LoRa server connection is available. Leave empty to rely on the LoRa server connection alone.'));
++  o.datatype='or(hostname,ip4addr)'; o.rmempty=true;
++  o = s.option(form.DummyValue,'_status',_('Current indicators'));
++  o.cfgvalue=function() { return _('Internet')+': '+(state.internet || '?')+' / '+_('Wi-Fi')+': '+(state.wifi || '?')+' / '+_('LoRa')+': '+(state.lora || '?'); };
++  return m.render();
++ }
++});
+diff --git a/package/utils/femto-lorawan/patches/001-radio-health.patch b/package/utils/femto-lorawan/patches/001-radio-health.patch
+new file mode 100644
+index 0000000..bea529a
+--- /dev/null
++++ b/package/utils/femto-lorawan/patches/001-radio-health.patch
+@@ -0,0 +1,38 @@
++--- a/lora_pkt_fwd/src/lora_pkt_fwd.c
+++++ b/lora_pkt_fwd/src/lora_pkt_fwd.c
++@@ -26,6 +26,7 @@
++     #define _XOPEN_SOURCE 500
++ #endif
++ 
+++#include "femto-status.h"
++ #include <stdint.h>         /* C99 types */
++ #include <stdbool.h>        /* bool type */
++ #include <stdio.h>          /* printf, fprintf, snprintf, fopen, fputs */
++@@ -1193,7 +1194,8 @@
++     /* starting the concentrator */
++     i = lgw_start();
++     if (i == LGW_HAL_SUCCESS) {
++-        MSG("INFO: [main] concentrator started, packet can now be received\n");
+++        femto_status("udp-radio", 1);
+++                MSG("INFO: [main] concentrator started, packet can now be received\n");
++     } else {
++         MSG("ERROR: [main] failed to start the concentrator\n");
++         exit(EXIT_FAILURE);
++@@ -1870,6 +1872,7 @@
++                 //MSG("WARNING: [up] ignored out-of sync ACK packet\n");
++                 continue;
++             } else {
+++                femto_status("udp-push-ack", 1);
++                 MSG("INFO: [up] PUSH_ACK received in %i ms\n", (int)(1000 * difftimespec(recv_time, send_time)));
++                 meas_up_ack_rcv += 1;
++                 break;
++@@ -2215,7 +2218,8 @@
++                         pthread_mutex_lock(&mx_meas_dw);
++                         meas_dw_ack_rcv += 1;
++                         pthread_mutex_unlock(&mx_meas_dw);
++-                        MSG("INFO: [down] PULL_ACK received in %i ms\n", (int)(1000 * difftimespec(recv_time, send_time)));
+++                        femto_status("udp-pull-ack", 1);
+++                MSG("INFO: [down] PULL_ACK received in %i ms\n", (int)(1000 * difftimespec(recv_time, send_time)));
++                     }
++                 } else { /* out-of-sync token */
++                     MSG("INFO: [down] received out-of-sync ACK\n");
 diff --git a/package/utils/femto-lorawan/src/board-info.c b/package/utils/femto-lorawan/src/board-info.c
 new file mode 100644
 index 0000000..6a69866
@@ -3459,6 +3707,31 @@ index 0000000..6a69866
 + if(lut)for(int i=0;i<16;i++){const unsigned char *p=ee+16+4*i;printf("%s{\"dig_gain\":%u,\"pa_gain\":%u,\"dac_gain\":%u,\"mix_gain\":%u,\"rf_power\":%.1f}",i?",":"",p[0],p[1],ee[14],p[2],(int8_t)p[3]/2.0);}
 + printf("]}\n");return 0;
 +}
+diff --git a/package/utils/femto-lorawan/src/femto-status.h b/package/utils/femto-lorawan/src/femto-status.h
+new file mode 100644
+index 0000000..ee62477
+--- /dev/null
++++ b/package/utils/femto-lorawan/src/femto-status.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0-only
++ * Credential-free radio health markers. All files live in private tmpfs.
++ */
++#ifndef FEMTO_STATUS_H
++#define FEMTO_STATUS_H
++#include <stdio.h>
++#include <unistd.h>
++#include <time.h>
++static inline void femto_status(const char *kind, int active) {
++ char path[160], tmp[164]; struct timespec now;
++ if (clock_gettime(CLOCK_MONOTONIC, &now)) return;
++ snprintf(path, sizeof(path), "/var/run/lorawan/%s.json", kind);
++ snprintf(tmp, sizeof(tmp), "%s.tmp", path);
++ FILE *f=fopen(tmp, "w"); if(!f) return;
++ fprintf(f, "{\"pid\":%ld,\"since\":%lld,\"active\":%d}\n", (long)getpid(), (long long)now.tv_sec, active);
++ if(fclose(f)) { unlink(tmp); return; }
++ if(rename(tmp,path)) unlink(tmp);
++}
++#endif
 diff --git a/package/utils/femto-lorawan/src/probe.c b/package/utils/femto-lorawan/src/probe.c
 new file mode 100644
 index 0000000..d49dc7c
@@ -3478,15 +3751,15 @@ index 0000000..d49dc7c
 +}
 diff --git a/package/utils/femto-basicstation/Makefile b/package/utils/femto-basicstation/Makefile
 new file mode 100644
-index 0000000..e4afa4d
+index 0000000..9d2eec4
 --- /dev/null
 +++ b/package/utils/femto-basicstation/Makefile
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,42 @@
 +# SPDX-License-Identifier: GPL-2.0-only
 +include $(TOPDIR)/rules.mk
 +PKG_NAME:=femto-basicstation
 +PKG_VERSION:=2.0.6
-+PKG_RELEASE:=1
++PKG_RELEASE:=2
 +PKG_SOURCE:=basicstation-$(PKG_VERSION).tar.gz
 +PKG_SOURCE_URL:=https://codeload.github.com/lorabasics/basicstation/tar.gz/v$(PKG_VERSION)?
 +PKG_HASH:=7e285de94bae1174b4c3496fc3ab15fe67c72f92c0693d2320bafc654a9dfb43
@@ -3495,9 +3768,10 @@ index 0000000..e4afa4d
 +	mkdir -p $(PKG_BUILD_DIR)
 +	tar -xf $(DL_DIR)/$(PKG_SOURCE) --strip-components=1 -C $(PKG_BUILD_DIR)
 +endef
-+PKG_LICENSE:=BSD-3-Clause
++PKG_LICENSE:=BSD-3-Clause GPL-2.0-only
 +PKG_LICENSE_FILES:=LICENSE hal/LICENSE
 +PKG_BUILD_DEPENDS:=libloragw
++PKG_FILE_DEPENDS:=../femto-lorawan/src/femto-status.h
 +include $(INCLUDE_DIR)/package.mk
 +include $(INCLUDE_DIR)/cmake.mk
 +
@@ -3511,6 +3785,7 @@ index 0000000..e4afa4d
 +
 +define Build/Prepare
 +	$(call Build/Prepare/Default)
++	$(CP) ../femto-lorawan/src/femto-status.h $(PKG_BUILD_DIR)/src/
 +	mkdir -p $(PKG_BUILD_DIR)/hal
 +	tar -xf $(DL_DIR)/lora-gateway-hal-5.0.1.tar.gz --strip-components=1 -C $(PKG_BUILD_DIR)/hal
 +	$(PATCH) -d $(PKG_BUILD_DIR)/hal -p1 < $(PKG_BUILD_DIR)/deps/lgw/v5.0.1-linux.patch
@@ -3592,6 +3867,64 @@ index 0000000..f8571d1
 + #include <errno.h>
 + #include <fcntl.h>
 + #include "rt.h"
+diff --git a/package/utils/femto-basicstation/patches/002-radio-health.patch b/package/utils/femto-basicstation/patches/002-radio-health.patch
+new file mode 100644
+index 0000000..b886464
+--- /dev/null
++++ b/package/utils/femto-basicstation/patches/002-radio-health.patch
+@@ -0,0 +1,52 @@
++--- a/src/tc.c
+++++ b/src/tc.c
++@@ -28,6 +28,7 @@
++ 
++ #include "s2conf.h"
++ #include "sys.h"
+++#include "femto-status.h"
++ #include "uj.h"
++ #include "kwcrc.h"
++ #include "s2e.h"
++@@ -39,6 +40,7 @@
++ 
++ 
++ static void tc_done (tc_t* tc, s1_t tstate) {
+++    femto_status("station-link", 0);
++     tc->tstate = tstate;
++     ws_free(&tc->ws);
++     rt_yieldTo(&tc->timeout, tc->ondone);
++@@ -58,6 +60,7 @@
++     if( ev == WSEV_CONNECTED ) {
++         rt_clrTimer(&tc->timeout);
++         tc->tstate = TC_MUXS_CONNECTED;
+++        femto_status("station-link", 1);
++         LOG(MOD_TCE|VERBOSE, "Connected to MUXS.");
++         dbuf_t b = ws_getSendbuf(&tc->ws, MIN_UPJSON_SIZE);
++         assert(b.buf != NULL);   // this should not fail on a fresh connection
++--- a/src/sx130xconf.c
+++++ b/src/sx130xconf.c
++@@ -31,6 +31,7 @@
++ #include "uj.h"
++ #include "kwcrc.h"
++ #include "sys.h"
+++#include "femto-status.h"
++ #if defined(CFG_linux)
++ #include "sys_linux.h"
++ #endif // defined(CFG_linux)
++@@ -708,6 +709,7 @@
++ #endif
++     log_flushIO();  // flush output since lgw_start may block for quite some time on some concentrators
++ 
+++    femto_status("station-radio", 0);
++     ustime_t t0 = rt_getTime();
++     int err = lgw_start();
++     if( err != LGW_HAL_SUCCESS ) {
++@@ -722,6 +724,7 @@
++         errmsg = "LGW GPS Enable";
++         goto fail;
++     }
+++    femto_status("station-radio", 1);
++     LOG(MOD_RAL|INFO, "Concentrator started (%~T)", rt_getTime()- t0);
++ #if defined(CFG_smtcpico)
++     {
 diff --git a/package/utils/femto-basicstation/src/CMakeLists.txt b/package/utils/femto-basicstation/src/CMakeLists.txt
 new file mode 100644
 index 0000000..e0d0105

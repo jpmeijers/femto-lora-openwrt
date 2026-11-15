@@ -1,48 +1,50 @@
 # Public build
 
-Build identifier: `public-v3`, prepared 2026-11-15.
+Build identifier: `public-v4`, prepared 2026-11-15.
 OpenWrt 23.05 branch / Linux 5.15.211, MIPS little-endian 24kc.
 Exact upstream revisions and regeneration commands: `docs/BUILD.md`.
-Matching board configuration, patch and HAL patches are at Git tag `public-v3`.
-Package versions are recorded in `packages.manifest`.
+Matching configuration, board patch and HAL patches are at Git tag `public-v4`.
+Package versions are in `packages.manifest`; artifact hashes in `SHA256SUMS`.
 
-Basic Station 2.0.6 with a private SX1301 HAL and the Femto SPI fixes is included,
-alongside the Semtech UDP forwarder. Select either protocol in LuCI. Fresh
-installations have forwarding and Wi-Fi disabled, UDP selected and a blank LNS
-API key. Upgrades retain the operator's configured protocol and credentials.
+This image adds eight GPIO LED outputs (four green/amber icon pairs), automatic
+Internet/Wi-Fi/LoRa readiness indicators, OpenWrt boot indications, and System →
+Gateway LEDs controls in LuCI. Native Basic Station connection/radio events and
+validated UDP acknowledgments provide credential-free RAM health markers.
+See `docs/LEDS.md` for exact meanings and detection limits.
+
+Basic Station 2.0.6 with its private SX1301 HAL/Femto SPI fixes and Semtech UDP
+are included. New installations have Wi-Fi and forwarding disabled, UDP selected
+and no LNS API key. Upgrades preserve the chosen protocol and credentials.
 No device EUI, MAC, Wi-Fi password, API key or generated SSH private key is
 embedded. Build user/host metadata is generic.
 
-Runtime identity discovery prefers the factory EEPROM cache, then a locally
-administered EUI derived from the factory Wi-Fi MAC. The included numeric EU TX
-reference table is used when no valid cached table is available. Downlinks
-default to enabled once forwarding is configured. Only EU hardware is supported.
-Firmware SHA256 values are in `SHA256SUMS`.
+Factory-cache EUI discovery, locally administered Wi-Fi-MAC fallback, cached/EU
+reference TX gains and enabled downlink defaults are retained. EU hardware only.
 
 **Experimental and unsupported. Flash at your own risk. No known tested factory
-rollback exists.** Hardware evidence comes from one EU unit. End-device RF
-round trips, measured output power, sensitivity, Class B, and other board or
-regional variants are not comprehensively validated. CUPS is not configured.
+rollback exists.** Evidence comes from one EU unit. End-device RF round trips,
+measured RF power/sensitivity, Class B and other hardware variants remain
+unverified. CUPS is not configured.
 
 ## Validation
 
-Both uImage CRCs and embedded RAM CPIO were verified. The UBI root volume matches
-the audited Squashfs. Public files and extracted rootfs are checked against known
-private credentials and identifiers. The default image includes Station and a
-CA bundle, with no configured LNS token or nonempty generated SSH host key.
+The three green status LED GPIOs were physically confirmed against the enclosure.
+Synthetic on-device policy tests cover live/dead processes, owned/unrelated TCP
+sockets, radio-ready flags, fresh/stale UDP ACKs, Wi-Fi states, disabled functions
+and manual LED control. Image uImage CRCs, embedded RAM CPIO privacy and exact
+UBI-to-Squashfs contents were checked. Public files and the extracted rootfs are
+scanned against known private identifiers and credentials.
 
-The first-install helper rejects execution from a running NAND root before
-writes. Its full factory-to-RAM install sequence has not been tested as an
-automated procedure on pristine factory firmware; the underlying manual write
-sequence was used during bring-up.
+The first-install helper rejects NAND-root execution before writes. Its complete
+factory-to-RAM automated installation remains untested on pristine factory
+firmware; the underlying manual write sequence was used during bring-up.
 
-The exact public-v3 sysupgrade image booted on the EU development unit with
-private Wi-Fi/LoRa configuration and SSH key hashes unchanged. Basic Station
-remained selected, authenticated to TTN over verified TLS, received the EU868
-channel plan and started the concentrator. Its process owned an established
-TCP connection to the LNS on port 8887 after reboot.
-
-Synthetic metadata tests and isolated on-device Station configuration tests
-passed, covering EUI preservation/fallback, region checks, TLS-only endpoints,
-missing-token rejection, bearer formatting/permissions, gain conversion and
-radio-reset timing. End-device RF uplink/downlink traffic remains unverified.
+The exact public-v4 image booted through NAND sysupgrade with private Wi-Fi/LoRa
+configuration and SSH key hashes unchanged. All four green GPIO outputs were
+verified. Stopping the enabled forwarder produced amber; disabling LoRa turned
+both LoRa outputs off. Basic Station reauthenticated to TTN and the indicator
+returned to green. The automatic service, LuCI configuration tracking and
+on-device isolated policy tests passed on the installed image.
+A native UDP test with a local acknowledgment peer also produced a green LoRa
+indicator; authenticated Basic Station was restored afterward without changing
+saved configuration.
